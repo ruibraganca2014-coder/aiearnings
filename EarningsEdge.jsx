@@ -535,6 +535,17 @@ export default function EarningsEdge() {
       const text = await fetchResearch(item.ticker, type);
       setResults((r) => r.map((x) => (x.id === item.id
         ? { ...x, research: { ...(x.research || {}), [type]: { text } } } : x)));
+      // clique individual numa pesquisa → busca dados frescos e atualiza os balões do gráfico no site.
+      // durante o batch (analyzeSelectedDeep) não publica aqui — o batch já publica (evita corrida de escrita).
+      if (!batchRunning) {
+        const token = localStorage.getItem("ee_admin_token");
+        if (token) {
+          const cal = calendar.find((c) => c.ticker === item.ticker && !c.past);
+          const all = await (await fetch("/api/picks/all", { cache: "no-store", headers: { Authorization: "Bearer " + token } })).json();
+          all[item.ticker] = pickFromItem(item, cal, all[item.ticker] || {});
+          await fetch("/api/picks", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + token }, body: JSON.stringify({ picks: all }) });
+        }
+      }
     } catch (e) {
       setResults((r) => r.map((x) => (x.id === item.id
         ? { ...x, research: { ...(x.research || {}), [type]: { err: e.message } } } : x)));
@@ -562,6 +573,44 @@ export default function EarningsEdge() {
         setResults((r) => r.map((x) => (x.id === p.id ? { id: p.id, ticker: p.ticker, errored: true, errMsg: e.message } : x)));
       }
     }
+    setSelected(new Set());
+    setBatchRunning(false);
+  };
+
+  // Analisar selecionadas + correr as 5 pesquisas aprofundadas em cada uma
+  const analyzeSelectedDeep = async () => {
+    const tickers = [...selected];
+    if (!tickers.length) return;
+    setBatchRunning(true);
+    const pend = tickers.map((t) => ({ id: Date.now() + Math.random(), ticker: t, pending: true }));
+    setResults((r) => [...pend, ...r]);
+    try { window.scrollTo({ top: 0, behavior: "smooth" }); } catch (_) {}
+    const items = [];
+    for (const p of pend) {
+      try {
+        const d = await fetchTicker(p.ticker, { llm: true });
+        const item = toItem(d, p.id, null, d._estimated);
+        setResults((r) => r.map((x) => (x.id === p.id ? item : x)));
+        items.push(item);
+      } catch (e) {
+        setResults((r) => r.map((x) => (x.id === p.id ? { id: p.id, ticker: p.ticker, errored: true, errMsg: e.message } : x)));
+      }
+    }
+    // publicar métricas completas nos cards (Previsões) — atualiza todos os campos do balão
+    try {
+      const token = localStorage.getItem("ee_admin_token");
+      if (token && items.length) {
+        const all = await (await fetch("/api/picks/all", { cache: "no-store", headers: { Authorization: "Bearer " + token } })).json();
+        for (const it of items) { const cal = calendar.find((c) => c.ticker === it.ticker && !c.past); all[it.ticker] = pickFromItem(it, cal, all[it.ticker] || {}); }
+        await fetch("/api/picks", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + token }, body: JSON.stringify({ picks: all }) });
+      }
+    } catch (_) {}
+    // pesquisa aprofundada: 5 análises por ação (pool de 4)
+    const types = ["financial", "equity", "earnings", "market", "government"];
+    const jobs = []; for (const it of items) for (const ty of types) jobs.push({ it, ty });
+    let j = 0;
+    const worker = async () => { while (j < jobs.length) { const { it, ty } = jobs[j++]; try { await runResearch(it, ty); } catch (_) {} } };
+    await Promise.all(Array.from({ length: 4 }, worker));
     setSelected(new Set());
     setBatchRunning(false);
   };
@@ -668,6 +717,9 @@ export default function EarningsEdge() {
               <>
                 <button className="ee-analyze-all" onClick={analyzeSelected} disabled={batchRunning || loading}>
                   {batchRunning ? "a analisar em tempo real…" : `⚡ Analisar selecionadas (${selected.size})`}
+                </button>
+                <button className="ee-analyze-all" style={{ background: "transparent", border: "1px solid var(--gold)", color: "var(--gold)" }} onClick={analyzeSelectedDeep} disabled={batchRunning || loading}>
+                  {batchRunning ? "…" : `🔬 Analisar + pesquisa aprofundada (${selected.size})`}
                 </button>
                 <button className="ee-sel-clear" onClick={() => setSelected(new Set())} disabled={batchRunning}>limpar</button>
               </>

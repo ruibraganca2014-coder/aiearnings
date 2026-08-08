@@ -24,11 +24,11 @@ export function writePicks(obj) {
   writeFileSync(FILE, JSON.stringify(obj || {}, null, 2));
   return obj;
 }
-// só os publicados (★ + recomendação), para o site público
+// só os publicados (show=true), para o site público
 export function publishedPicks() {
   const all = readPicks();
   const out = {};
-  for (const [k, v] of Object.entries(all)) if (v && v.show && (v.reco || v.featured)) out[k] = v;
+  for (const [k, v] of Object.entries(all)) if (v && v.show) out[k] = v;
   return out;
 }
 

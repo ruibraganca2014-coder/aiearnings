@@ -171,6 +171,12 @@ function Featured({ picks, suspenso }) {
                 {p.history && <Spark hist={p.history} marks={p.earningsMarks} />}
                 {p.probUp != null && <div><span>Probabilidade de subir</span><b style={{ color: p.probUp >= 55 ? "#2FA37A" : p.probUp <= 45 ? "#C8553D" : "#D6A445" }}>{p.probUp}%</b></div>}
                 {p.ev != null && <div><span>Valor esperado</span><b style={{ color: p.ev >= 0 ? "#2FA37A" : "#C8553D" }}>{p.ev >= 0 ? "+" : ""}{p.ev}%/trade</b></div>}
+                {p.gapAvg != null && <div><span>Gap médio nos resultados</span><b style={{ color: p.gapAvg >= 0 ? "#2FA37A" : "#C8553D" }}>{p.gapAvg >= 0 ? "+" : ""}{p.gapAvg}%{p.gapPctUp != null ? ` · ${p.gapPctUp}% sobem` : ""}</b></div>}
+                {p.impliedMove != null && <div><span>Movimento implícito</span><b>±{p.impliedMove}%</b></div>}
+                {p.momentum != null && <div><span>Momentum (1 mês)</span><b style={{ color: p.momentum >= 0 ? "#2FA37A" : "#C8553D" }}>{p.momentum >= 0 ? "+" : ""}{p.momentum}%</b></div>}
+                {p.rsi != null && <div><span>RSI (14){p.trend ? " · tendência" : ""}</span><b>{p.rsi}{p.trend ? ` · ${p.trend === "bullish" ? "alta" : p.trend === "bearish" ? "baixa" : "neutra"}` : ""}</b></div>}
+                {p.analyst && <div><span>Analistas{p.targetUpside != null ? " · alvo" : ""}</span><b style={{ color: p.analyst === "bullish" ? "#2FA37A" : p.analyst === "bearish" ? "#C8553D" : "var(--tx)" }}>{p.analyst === "bullish" ? "otimistas" : p.analyst === "bearish" ? "pessimistas" : "neutros"}{p.targetUpside != null ? ` · ${p.targetUpside >= 0 ? "+" : ""}${p.targetUpside}%` : ""}</b></div>}
+                {p.beatRate != null && <div><span>Histórico de beat (EPS)</span><b>{p.beatRate}%</b></div>}
               </div>
             )}
           </div>
@@ -321,7 +327,6 @@ function Positions() {
 
 function Metodo({ ledger }) {
   const led = ledger?.stats || null;
-  const ex = (ledger?.trades || []).find((t) => t.ticker === "NET") || (ledger?.trades || []).find((t) => t.pl > 0) || null;
   // Fast Run: fluxo único — varrer → recolher → pontuar → escolher → entrar → gerir
   const flow = [
     { n: "1", fase: "Análise", t: "Varrer os resultados do dia", d: "Todos os dias, o Fast Run lista as empresas que apresentam resultados (EUA + Europa)." },
@@ -330,21 +335,6 @@ function Metodo({ ledger }) {
     { n: "4", fase: "Decisão", t: "O gestor escolhe a recomendação", d: "Entre as candidatas, escolho a que recomendaria — a “Escolha do trader”. Decisão humana, não automática." },
     { n: "5", fase: "Execução", t: "Entrar antes dos resultados", d: "Compro segundos antes do fecho da bolsa, no dia do anúncio: capital base €2.500, uma posição de cada vez, com margem DEGIRO (amplifica ganhos e perdas)." },
     { n: "6", fase: "Execução", t: "Gerir e sair", d: "Sobe → vendo o ganho. Cai → espero recuperar o preço, mas corto no stop de −10%. Ao fim do mês retiro o lucro e reponho a base." },
-  ];
-  const fontes = [
-    { t: "Analistas & preço-alvo", d: "recomendações e potencial vs preço atual" },
-    { t: "Mercado & histórico", d: "reações passadas, gap, momentum, RSI, tendência" },
-    { t: "Opções", d: "movimento implícito (straddle ATM)" },
-    { t: "Fundamentais", d: "beat histórico, valuation, revisões de EPS" },
-  ];
-  const regras = [
-    ["Capital base", "€2.500"],
-    ["Posições em simultâneo", "1 (capital todo)"],
-    ["Alavancagem", "margem DEGIRO"],
-    ["Entrada", "segundos antes do fecho (dia do anúncio)"],
-    ["Stop de perda", "−10%"],
-    ["Saída", "ao recuperar o preço (ou stop)"],
-    ["Lucro", "retirado ao fim do mês"],
   ];
   return (
     <section id="site-metodo" className="ts-sec">
@@ -359,32 +349,6 @@ function Metodo({ ledger }) {
             <p>{s.d}</p>
           </div>
         ))}
-      </div>
-
-      <div className="ts-fontes">
-        <h3>Fontes que o Fast Run analisa</h3>
-        <div className="ts-fontesgrid">
-          {fontes.map((f) => <div className="ts-fonte" key={f.t}><b>{f.t}</b><span>{f.d}</span></div>)}
-        </div>
-      </div>
-
-      <div className="ts-metgrid">
-        <div className="ts-regras">
-          <h3>Regras concretas</h3>
-          <table><tbody>{regras.map(([k, v]) => <tr key={k}><td>{k}</td><td>{v}</td></tr>)}</tbody></table>
-        </div>
-        {ex && (
-          <div className="ts-exemplo">
-            <h3>Exemplo real</h3>
-            <div className="ts-extic"><Mono ticker={ex.ticker} sector="cyber" /> <b>{ex.ticker}</b> · {ex.name}</div>
-            <ul>
-              <li>Comprou <b>{ex.qty}</b> @ <b>${ex.buyPx}</b> ({eur(ex.cost)}, com margem)</li>
-              <li>Nos resultados <b>subiu</b> → vendeu @ <b>${ex.sellPx}</b></li>
-              <li>Resultado <b style={{ color: "#2FA37A" }}>+{eur(ex.pl)} ({ex.pct >= 0 ? "+" : ""}{ex.pct}%)</b> em <b>{ex.holdDays} {ex.holdDays === 1 ? "dia" : "dias"}</b></li>
-            </ul>
-            <div className="ts-exnote">Exemplo de um trade que correu bem. Há trades que correm mal (ver <a href="#site-hist">Histórico</a>) — GOOG fez −7,7%.</div>
-          </div>
-        )}
       </div>
 
       {led && led.n > 0 && (

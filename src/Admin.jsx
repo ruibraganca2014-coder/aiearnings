@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import EarningsEdge from "../EarningsEdge.jsx";
 import { getToken, setToken, clearToken, fetchAll, savePicks, login, fetchPositions, savePositions, fetchPrices, daysBetween, fetchHistory, saveHistory, extractDoc, fetchEmails, fetchSettings, saveSettings, uploadLedger } from "./picks.js";
+import { TRADES } from "./trades.js";
 import { WD, exchOf, fmtDay } from "./shared.js";
 
 const emptyRec = () => ({ type: "reaction", ticker: "", name: "", date: new Date().toISOString().slice(0, 10), pct: "", pnl: "", predicted: "SUBIR", probUp: "", nota: "" });
