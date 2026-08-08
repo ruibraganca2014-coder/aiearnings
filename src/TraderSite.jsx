@@ -86,7 +86,7 @@ function TickerTape({ items }) {
   );
 }
 
-const RESEARCH_LABELS = { financial: "Análise financeira", equity: "Análise de ações", earnings: "Revisão de resultados", market: "Análise de mercado", government: "Contratos & governo" };
+const RESEARCH_LABELS = { financial: "Análise financeira", equity: "Análise de ações", earnings: "Revisão de resultados", market: "Análise de mercado" };
 const THEME_LABELS = { ai: "IA & Software", cloud: "Cloud", cyber: "Cibersegurança", semis: "Semicondutores", memory: "Memória", datacenter: "Data centers", networking: "Redes", storage: "Armazenamento", finance: "Finanças", crypto: "Cripto", health: "Saúde", consumer: "Consumo", powergrid: "Energia", industrial: "Industrial", defense: "Defesa & Espaço", ev: "Veículos elétricos", solar: "Solar", minerals: "Minerais", gaming: "Media & Gaming" };
 // mini-barra -1..+1 (sinais) ou centrada em 0 (reações %)
 function SigBar({ v, max = 1 }) {
@@ -94,6 +94,18 @@ function SigBar({ v, max = 1 }) {
   const w = Math.abs(pct) * 50;
   const col = pct >= 0 ? "#2FA37A" : "#C8553D";
   return <span className="ts-sigbar"><span className="ts-sigfill" style={{ width: w + "%", left: pct >= 0 ? "50%" : (50 - w) + "%", background: col }} /></span>;
+}
+// célula compacta de métrica no card das Previsões (valor + barra opcional)
+function FtCell({ l, v, c, sub, fill, fillc, sig, sigmax }) {
+  return (
+    <div className="ts-ftcell">
+      <span className="ts-ftcl">{l}</span>
+      <b style={c ? { color: c } : undefined}>{v}</b>
+      {sub && <small>{sub}</small>}
+      {fill != null && <span className="ts-fill"><span style={{ width: Math.max(0, Math.min(100, fill)) + "%", background: fillc || "#8CA3B3" }} /></span>}
+      {sig != null && <SigBar v={sig} max={sigmax || 1} />}
+    </div>
+  );
 }
 
 // Modal de detalhe (abre ao clicar 2× numa ação). Mostra métricas + gráfico + pesquisa aprofundada.
@@ -189,6 +201,12 @@ function TraderPick({ pick, onDetail }) {
             )}
           </div>
         )}
+        <div className="ts-tpextra" onClick={(e) => e.stopPropagation()}>
+          {(p.when || p.buyBy || p.entryISO) && <span><b>Entrada:</b> {p.when === "BMO" ? "pré-abertura" : p.when === "AMC" ? "após fecho" : "intradia"}{p.buyBy ? ` · ${p.buyBy}` : p.entryISO ? ` · até ${fmtDay(p.entryISO)}` : ""}</span>}
+          {p.reactionLow != null && p.reactionHigh != null && <span><b>Reação típica:</b> {p.reactionLow}%…{p.reactionHigh}% (±1σ){p.reactionMin != null ? ` · extremos ${p.reactionMin}%…${p.reactionMax}%` : ""}{p.reactionN ? ` · ${p.reactionN} amostras` : ""}</span>}
+          {p.shortPct != null && <span><b>Short interest:</b> {p.shortPct}% do float</span>}
+          {p.confidence != null && <span><b>Confiança IA:</b> {p.confidence}%{p.signals?.length ? ` · ${p.signals.length} sinais` : ""}{p.reactionN ? ` · ${p.reactionN} reações` : ""}</span>}
+        </div>
         {rTypes.length > 0 && (
           <div className="ts-tpresearch" onClick={(e) => e.stopPropagation()}>
             <div className="ts-tprtabs">
@@ -255,17 +273,19 @@ export function Featured({ picks, suspenso, onDetail }) {
             <div className="ts-ftname">{p.name}{p.sector && p.sector !== "other" && <span className="ts-ftsect">{p.sector}</span>}</div>
             <div className="ts-ftmeta">{p.exch || "EUA"}{p.entryISO ? " · entrar " + fmtDay(p.entryISO) : ""}</div>
             {hasA && !suspenso && (
-              <div className="ts-ftdet">
-                {p.history && <Spark hist={p.history} marks={p.earningsMarks} />}
-                {p.probUp != null && <div><span>Probabilidade de subir</span><b style={{ color: p.probUp >= 55 ? "#2FA37A" : p.probUp <= 45 ? "#C8553D" : "#D6A445" }}>{p.probUp}%</b></div>}
-                {p.ev != null && <div><span>Valor esperado</span><b style={{ color: p.ev >= 0 ? "#2FA37A" : "#C8553D" }}>{p.ev >= 0 ? "+" : ""}{p.ev}%/trade</b></div>}
-                {p.gapAvg != null && <div><span>Gap médio nos resultados</span><b style={{ color: p.gapAvg >= 0 ? "#2FA37A" : "#C8553D" }}>{p.gapAvg >= 0 ? "+" : ""}{p.gapAvg}%{p.gapPctUp != null ? ` · ${p.gapPctUp}% sobem` : ""}</b></div>}
-                {p.impliedMove != null && <div><span>Movimento implícito</span><b>±{p.impliedMove}%</b></div>}
-                {p.momentum != null && <div><span>Momentum (1 mês)</span><b style={{ color: p.momentum >= 0 ? "#2FA37A" : "#C8553D" }}>{p.momentum >= 0 ? "+" : ""}{p.momentum}%</b></div>}
-                {p.rsi != null && <div><span>RSI (14){p.trend ? " · tendência" : ""}</span><b>{p.rsi}{p.trend ? ` · ${p.trend === "bullish" ? "alta" : p.trend === "bearish" ? "baixa" : "neutra"}` : ""}</b></div>}
-                {p.analyst && <div><span>Analistas{p.targetUpside != null ? " · alvo" : ""}</span><b style={{ color: p.analyst === "bullish" ? "#2FA37A" : p.analyst === "bearish" ? "#C8553D" : "var(--tx)" }}>{p.analyst === "bullish" ? "otimistas" : p.analyst === "bearish" ? "pessimistas" : "neutros"}{p.targetUpside != null ? ` · ${p.targetUpside >= 0 ? "+" : ""}${p.targetUpside}%` : ""}</b></div>}
-                {p.beatRate != null && <div><span>Histórico de beat (EPS)</span><b>{p.beatRate}%</b></div>}
-              </div>
+              <>
+                {p.history && <div className="ts-ftspark"><Spark hist={p.history} marks={p.earningsMarks} /></div>}
+                <div className="ts-ftgrid">
+                  {p.probUp != null && <FtCell l="Prob. subir" v={p.probUp + "%"} c={probColor(p.probUp)} fill={p.probUp} fillc={probColor(p.probUp)} />}
+                  {p.ev != null && <FtCell l="Valor esperado" v={(p.ev >= 0 ? "+" : "") + p.ev + "%"} c={p.ev >= 0 ? "#2FA37A" : "#C8553D"} sig={p.ev} sigmax={12} />}
+                  {p.gapAvg != null && <FtCell l="Gap médio" v={(p.gapAvg >= 0 ? "+" : "") + p.gapAvg + "%"} c={p.gapAvg >= 0 ? "#2FA37A" : "#C8553D"} sub={p.gapPctUp != null ? p.gapPctUp + "% sobem" : ""} sig={p.gapAvg} sigmax={10} />}
+                  {p.impliedMove != null && <FtCell l="Mov. implícito" v={"±" + p.impliedMove + "%"} fill={Math.min(100, p.impliedMove * 5)} fillc="#8CA3B3" />}
+                  {p.momentum != null && <FtCell l="Momentum 1m" v={(p.momentum >= 0 ? "+" : "") + p.momentum + "%"} c={p.momentum >= 0 ? "#2FA37A" : "#C8553D"} sig={p.momentum} sigmax={15} />}
+                  {p.rsi != null && <FtCell l={"RSI" + (p.trend ? " · " + (p.trend === "bullish" ? "alta" : p.trend === "bearish" ? "baixa" : "neutra") : "")} v={String(p.rsi)} fill={p.rsi} fillc={p.rsi >= 70 ? "#C8553D" : p.rsi <= 30 ? "#2FA37A" : "#8CA3B3"} />}
+                  {p.analyst && <FtCell l="Analistas" v={p.analyst === "bullish" ? "otimistas" : p.analyst === "bearish" ? "pessimistas" : "neutros"} c={p.analyst === "bullish" ? "#2FA37A" : p.analyst === "bearish" ? "#C8553D" : "var(--tx)"} sub={p.targetUpside != null ? "alvo " + (p.targetUpside >= 0 ? "+" : "") + p.targetUpside + "%" : ""} />}
+                  {p.beatRate != null && <FtCell l="Beat (EPS)" v={p.beatRate + "%"} fill={p.beatRate} fillc="#8CA3B3" />}
+                </div>
+              </>
             )}
           </div>
         );
@@ -831,6 +851,15 @@ export const CSS = `
 .ts-ftdet{margin-top:10px;border-top:1px solid var(--line);padding-top:10px;display:flex;flex-direction:column;gap:6px;}
 .ts-ftdet>div{display:flex;justify-content:space-between;font-size:12.5px;color:var(--mut);}
 .ts-ftdet>div b{color:var(--tx);font-family:'IBM Plex Mono',monospace;}
+/* grelha compacta dos cards das Previsões */
+.ts-ftspark{margin:8px 0;}
+.ts-ftgrid{margin-top:10px;border-top:1px solid var(--line);padding-top:10px;display:grid;grid-template-columns:1fr 1fr;gap:9px 12px;}
+.ts-ftcell{display:flex;flex-direction:column;gap:2px;min-width:0;}
+.ts-ftcl{font-size:10.5px;color:var(--mut);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.ts-ftcell b{font-family:'IBM Plex Mono',monospace;font-size:14px;color:var(--tx);}
+.ts-ftcell small{font-size:9.5px;color:var(--mut);}
+.ts-fill{display:block;height:4px;background:var(--s2);border-radius:2px;overflow:hidden;margin-top:1px;}
+.ts-fill>span{display:block;height:100%;border-radius:2px;}
 .ts-ftwarn{display:block!important;color:#f0d9a8;font-size:11px;line-height:1.4;background:rgba(214,164,69,.1);border-radius:6px;padding:8px;margin-top:4px;}
 .ts-pmetrics{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--mut);white-space:nowrap;}
 .ts-pbadge{color:#0E1620;font-weight:700;font-size:10.5px;padding:1px 7px;border-radius:5px;font-family:'IBM Plex Mono',monospace;}
@@ -972,6 +1001,8 @@ export const CSS = `
 .ts-tpreacbars{display:flex;align-items:flex-end;gap:3px;height:44px;}
 .ts-tpreacbar{flex:1;max-width:22px;height:100%;display:flex;align-items:flex-end;background:var(--s2);border-radius:3px;overflow:hidden;}
 .ts-tpreacbar>span{display:block;width:100%;border-radius:3px;}
+.ts-tpextra{margin-top:12px;padding-top:10px;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:5px;font-size:12px;color:var(--mut);}
+.ts-tpextra b{color:var(--tx);font-weight:600;}
 @media(max-width:620px){.ts-tpchart{width:100%;}}
 /* método: timeline + regras + exemplo + stats + aviso */
 .ts-tl{display:flex;align-items:stretch;gap:8px;margin:22px 0;flex-wrap:wrap;}

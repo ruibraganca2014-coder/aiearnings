@@ -285,7 +285,7 @@ function DestaqueAdmin({ token, onAuthFail }) {
       const reac = q.reactions || [], mean = (a) => (a.length ? a.reduce((x, y) => x + y, 0) / a.length : 0);
       const pUp = (q.llm?.probUp ?? q.lean?.probUp ?? 50) / 100;
       const ev = reac.length >= 4 ? pUp * mean(reac.filter((r) => r > 0)) + (1 - pUp) * mean(reac.filter((r) => r < 0)) : null;
-      const types = ["financial", "equity", "earnings", "market", "government"], research = {};
+      const types = ["financial", "equity", "earnings", "market"], research = {};
       await Promise.all(types.map(async (ty) => { try { const rr = await (await fetch(`/api/yahoo/research?symbol=${encodeURIComponent(ticker)}&type=${ty}`, { cache: "no-store" })).json(); if (rr && rr.text) research[ty] = rr.text; } catch {} }));
       const all = await fetchAll(token);
       all[key] = {
@@ -296,6 +296,8 @@ function DestaqueAdmin({ token, onAuthFail }) {
         rsi: q.rsi ?? null, analyst: q.analyst || "", beatRate: q.beatRate ?? null, targetUpside: q.targetUpside ?? null, price: q.price ?? null,
         history: q.history || null, earningsMarks: q.earningsMarks || null, sector: q.sector || all[key].sector || "", research,
         signals: q.lean?.signals || null, reactions: Array.isArray(q.reactions) ? q.reactions : null,
+        reactionStd: q.reactionStd ?? null, reactionLow: q.reactionLow ?? null, reactionHigh: q.reactionHigh ?? null,
+        reactionMin: q.reactionMin ?? null, reactionMax: q.reactionMax ?? null, reactionN: q.reactionN ?? null, shortPct: q.shortPct ?? null,
       };
       await savePicks(token, all);
       setPicks(all); setSaved(true);

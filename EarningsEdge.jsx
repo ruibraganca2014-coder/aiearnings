@@ -338,7 +338,6 @@ const RESEARCH_META = {
   equity:    { label: "Análise de ações",   ask: "an equity research summary: current analyst consensus rating, the average 12-month price target and implied upside/downside, a short valuation view, and a brief bull case and bear case." },
   earnings:  { label: "Revisão de resultados", ask: "a review of the most recent quarterly earnings: EPS and revenue vs estimates, guidance given, the main takeaways, and how the stock reacted. Then note 2-3 things to watch in the upcoming report." },
   market:    { label: "Análise de mercado", ask: "market and sector research: the company's sector and main competitors/peers, recent sector trends, and the current macro factors (rates, demand, regulation) affecting it." },
-  government:{ label: "Contratos & governo",  ask: "the company's exposure to the US federal government: recent PUBLICLY DISCLOSED federal contracts awarded to it (from sources like USAspending.gov, the Department of Defense daily contract announcements, or the company's own 8-K filings), any notable open solicitations on SAM.gov relevant to it, and how US government policy, tariffs or regulation currently affect it. Make clear this is publicly available context, not a prediction of future awards." },
 };
 
 async function fetchResearch(ticker, type) {
@@ -425,6 +424,9 @@ export default function EarningsEdge() {
       sector: item.sector || cur.sector || "",
       signals: item.lean?.signals || cur.signals || null,   // sinais fundamentais (beat, revisões, valuation, qualidade)
       reactions: Array.isArray(item.reactions) ? item.reactions : (cur.reactions || null), // drifts passados (PEAD)
+      reactionStd: item.reactionStd ?? null, reactionLow: item.reactionLow ?? null, reactionHigh: item.reactionHigh ?? null,
+      reactionMin: item.reactionMin ?? null, reactionMax: item.reactionMax ?? null, reactionN: item.reactionN ?? null,
+      shortPct: item.shortPct ?? null, buyBy: cal?.buyBy || cur.buyBy || null,
       nota: cur.nota || item.llm?.reasoning || "",
       // pesquisa aprofundada (texto das 5 análises) — só o texto, para mostrar no site
       research: (() => {
@@ -471,7 +473,7 @@ export default function EarningsEdge() {
       setAutoMsg(`publicado ${items.length} em Previsões · a correr pesquisa aprofundada…`);
     } catch (_) { setAutoMsg("falha ao publicar picks."); }
     // 3) pesquisa aprofundada: 5 análises por ação (pool de 4)
-    const types = ["financial", "equity", "earnings", "market", "government"];
+    const types = ["financial", "equity", "earnings", "market"];
     const jobs = []; for (const it of items) for (const ty of types) jobs.push({ it, ty });
     let j = 0;
     const rworker = async () => { while (j < jobs.length) { const { it, ty } = jobs[j++]; try { await runResearch(it, ty); } catch (_) {} } };
@@ -626,7 +628,7 @@ export default function EarningsEdge() {
       }
     } catch (_) {}
     // pesquisa aprofundada: 5 análises por ação (pool de 4) — acumula o texto p/ persistir
-    const types = ["financial", "equity", "earnings", "market", "government"];
+    const types = ["financial", "equity", "earnings", "market"];
     const acc = {}; // ticker -> { type: {text} }
     const jobs = []; for (const it of items) for (const ty of types) jobs.push({ it, ty });
     let j = 0;
