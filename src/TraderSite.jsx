@@ -89,7 +89,7 @@ function TickerTape({ items }) {
 const RESEARCH_LABELS = { financial: "Análise financeira", equity: "Análise de ações", earnings: "Revisão de resultados", market: "Análise de mercado", government: "Contratos & governo" };
 
 // Modal de detalhe (abre ao clicar 2× numa ação). Mostra métricas + gráfico + pesquisa aprofundada.
-function StockModal({ pick, onClose }) {
+export function StockModal({ pick, onClose }) {
   const [rTab, setRTab] = useState(null);
   useEffect(() => {
     const onKey = (e) => e.key === "Escape" && onClose();
@@ -139,16 +139,13 @@ function StockModal({ pick, onClose }) {
 // Escolha do trader — a pick que o admin marcou com ★. Card grande no topo, clicável.
 function TraderPick({ pick, onDetail }) {
   const [rTab, setRTab] = useState(null);
-  const clickT = useRef(null);
   if (!pick) return null;
   const p = pick;
   const research = p.research && typeof p.research === "object" ? p.research : null;
   const rTypes = research ? Object.keys(RESEARCH_LABELS).filter((t) => research[t]) : [];
   return (
     <section className="ts-sec ts-tpsec">
-      <div className="ts-tpcard" style={{ borderColor: probColor(p.probUp) }}
-        onClick={() => { if (clickT.current) return; clickT.current = setTimeout(() => { clickT.current = null; goStock(p.ticker); }, 230); }}
-        onDoubleClick={() => { if (clickT.current) { clearTimeout(clickT.current); clickT.current = null; } onDetail && onDetail(p); }}>
+      <div className="ts-tpcard" style={{ borderColor: probColor(p.probUp) }} onClick={() => onDetail && onDetail(p)}>
         <div className="ts-tphead">
           <span className="ts-tplabel">★ Escolha do trader</span>
           {p.probUp != null && <span className="ts-ftbadge" style={{ background: probColor(p.probUp) }}>↑ {p.probUp}% subir</span>}
@@ -216,8 +213,7 @@ function CookieBanner() {
   );
 }
 
-function Featured({ picks, suspenso, onDetail }) {
-  const clickT = useRef(null);
+export function Featured({ picks, suspenso, onDetail }) {
   const list = Object.values(picks || {}).filter((p) => p.show && exchOf(p.ticker) === "EUA")
     .sort((a, b) => (a.entryISO || a.date || "").localeCompare(b.entryISO || b.date || ""))
     .slice(0, 8); // as próximas 8 publicadas (EUA, por data)
@@ -228,9 +224,8 @@ function Featured({ picks, suspenso, onDetail }) {
         const hasA = p.probUp != null || p.confidence != null || p.impliedMove != null || p.ev != null || p.gapUp != null || p.momentum != null || p.rsi != null || p.analyst || p.beatRate != null || p.history;
         return (
           <div className="ts-feat ts-feat--clk" key={p.ticker} style={{ borderTopColor: probColor(p.probUp) }}
-            onClick={() => { if (clickT.current) return; clickT.current = setTimeout(() => { clickT.current = null; goStock(p.ticker); }, 230); }}
-            onDoubleClick={() => { if (clickT.current) { clearTimeout(clickT.current); clickT.current = null; } onDetail && onDetail(p); }}
-            title={"Clica: análise · 2× clica: detalhe rápido"}>
+            onClick={() => onDetail && onDetail(p)}
+            title={"Clica para ver o detalhe de " + p.ticker}>
             <div className="ts-feathd"><span className="ts-fttic"><Mono ticker={p.ticker} sector={p.sector} /> {p.ticker} <span className="ts-aitag" title="Análise assistida por IA">IA</span></span>{suspenso ? <span className="ts-ftbadge" style={{ background: "#8CA3B3" }}>SUSPENSO</span> : p.probUp != null ? <span className="ts-ftbadge" style={{ background: probColor(p.probUp) }}>↑ {p.probUp}%</span> : null}</div>
             <div className="ts-ftname">{p.name}{p.sector && p.sector !== "other" && <span className="ts-ftsect">{p.sector}</span>}</div>
             <div className="ts-ftmeta">{p.exch || "EUA"}{p.entryISO ? " · entrar " + fmtDay(p.entryISO) : ""}</div>
@@ -255,7 +250,6 @@ function Featured({ picks, suspenso, onDetail }) {
 }
 
 function Predictions({ picks, suspenso, onDetail }) {
-  const clickT = useRef(null);
   const [rows, setRows] = useState(null);
   const [err, setErr] = useState("");
   useEffect(() => {
@@ -287,9 +281,8 @@ function Predictions({ picks, suspenso, onDetail }) {
             <div className="ts-dayhdr">{wd} · {fmtDay(grp.day)} <span>entrar até ~fecho</span></div>
             {grp.items.map((it) => (
               <div className="ts-prow ts-prow--exp" key={(it.entryISO || it.date) + it.ticker + it.when}
-                onClick={() => { if (clickT.current) return; clickT.current = setTimeout(() => { clickT.current = null; goStock(it.ticker); }, 230); }}
-                onDoubleClick={() => { if (clickT.current) { clearTimeout(clickT.current); clickT.current = null; } onDetail && onDetail(picks[it.ticker] || { ticker: it.ticker, name: it.name, exch: exchOf(it.ticker), entryISO: it.entryISO, date: it.date }); }}
-                title={"Clica: análise · 2× clica: detalhe rápido"}>
+                onClick={() => onDetail && onDetail(picks[it.ticker] || { ticker: it.ticker, name: it.name, exch: exchOf(it.ticker), entryISO: it.entryISO, date: it.date })}
+                title={"Clica para ver o detalhe de " + it.ticker}>
                 <span className="ts-ptic">{it.ticker}</span>
                 <span className="ts-pex">{exchOf(it.ticker)}</span>
                 <span className="ts-pname">{it.name}</span>

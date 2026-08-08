@@ -266,12 +266,41 @@ function HistoricoAdmin({ token, onAuthFail }) {
 function DestaqueAdmin({ token, onAuthFail }) {
   const [picks, setPicks] = useState(null);
   const [saved, setSaved] = useState(true);
+  const [busyTicker, setBusyTicker] = useState(null);
   useEffect(() => { fetchAll(token).then(setPicks).catch((e) => { if (String(e.message) === "401") onAuthFail(); }); }, []);
   if (!picks) return <div className="ad-muted">A carregar picks…</div>;
   const entries = Object.entries(picks).filter(([, v]) => v.show)
     .sort((a, b) => (a[1].entryISO || a[1].date || "").localeCompare(b[1].entryISO || b[1].date || ""));
   const persist = (next) => { setPicks(next); setSaved(false); savePicks(token, next).then(() => setSaved(true)).catch((e) => { if (String(e.message) === "401") onAuthFail(); }); };
-  const setFeatured = (key) => { const next = {}; for (const [k, v] of Object.entries(picks)) next[k] = { ...v, featured: k === key ? !v.featured : false }; persist(next); };
+  // marcar ★ → também corre a análise + as 5 pesquisas aprofundadas e guarda-as no card
+  const setFeatured = async (key) => {
+    const turningOn = !picks[key].featured;
+    const next = {}; for (const [k, v] of Object.entries(picks)) next[k] = { ...v, featured: k === key ? turningOn : false };
+    persist(next);
+    if (!turningOn) return;
+    const ticker = picks[key].ticker;
+    setBusyTicker(ticker);
+    try {
+      const q = await (await fetch(`/api/yahoo/quote?symbol=${encodeURIComponent(ticker)}&llm=1`, { cache: "no-store" })).json();
+      const reac = q.reactions || [], mean = (a) => (a.length ? a.reduce((x, y) => x + y, 0) / a.length : 0);
+      const pUp = (q.llm?.probUp ?? q.lean?.probUp ?? 50) / 100;
+      const ev = reac.length >= 4 ? pUp * mean(reac.filter((r) => r > 0)) + (1 - pUp) * mean(reac.filter((r) => r < 0)) : null;
+      const types = ["financial", "equity", "earnings", "market", "government"], research = {};
+      await Promise.all(types.map(async (ty) => { try { const rr = await (await fetch(`/api/yahoo/research?symbol=${encodeURIComponent(ticker)}&type=${ty}`, { cache: "no-store" })).json(); if (rr && rr.text) research[ty] = rr.text; } catch {} }));
+      const all = await fetchAll(token);
+      all[key] = {
+        ...all[key], featured: true, show: true, name: q.name || all[key].name,
+        probUp: q.lean?.probUp ?? q.llm?.probUp ?? all[key].probUp ?? null, confidence: q.lean?.confidence ?? q.llm?.confidence ?? null,
+        ev: ev != null ? Math.round(ev * 100) / 100 : (all[key].ev ?? null),
+        impliedMove: q.impliedMove ?? null, gapAvg: q.gapAvg ?? null, gapPctUp: q.gapPctUp ?? null, momentum: q.momentum ?? null,
+        rsi: q.rsi ?? null, analyst: q.analyst || "", beatRate: q.beatRate ?? null, targetUpside: q.targetUpside ?? null, price: q.price ?? null,
+        history: q.history || null, earningsMarks: q.earningsMarks || null, sector: q.sector || all[key].sector || "", research,
+      };
+      await savePicks(token, all);
+      setPicks(all); setSaved(true);
+    } catch (e) { if (String(e.message) === "401") onAuthFail(); }
+    setBusyTicker(null);
+  };
   const setNota = (key, val) => setPicks((p) => ({ ...p, [key]: { ...p[key], nota: val } }));
   const saveNotas = () => persist(picks);
   const featuredKey = entries.find(([, v]) => v.featured)?.[0];
@@ -280,13 +309,13 @@ function DestaqueAdmin({ token, onAuthFail }) {
       <div className="ad-bar">Escolha do trader · marca <b>UMA</b> ação publicada com <b>★</b> — aparece em destaque no topo do site. {featuredKey ? <>Atual: <b>{picks[featuredKey].ticker}</b></> : <span style={{ color: "#D6A445" }}>nenhuma escolhida</span>} · <span style={{ color: saved ? "#2FA37A" : "#D6A445" }}>{saved ? "guardado ✓" : "a guardar…"}</span></div>
       {!entries.length ? <div className="ad-muted">Sem picks publicadas. Publica no Painel de análise primeiro.</div> : (
         <>
-          <div className="ad-muted" style={{ marginBottom: 8 }}>Escreve o motivo (nota) e clica <b>Guardar notas</b>. O ★ grava logo.</div>
+          <div className="ad-muted" style={{ marginBottom: 8 }}>Escreve o motivo (nota) e clica <b>Guardar notas</b>. O <b>★</b> grava logo e <b>corre as 5 pesquisas aprofundadas</b> da ação (aparecem no card do site). {busyTicker && <span style={{ color: "#D6A445" }}>⏳ a analisar {busyTicker}…</span>}</div>
           <table className="ad-tbl">
             <thead><tr><th>★</th><th>Ticker</th><th>Nome</th><th>Prob ↑</th><th>Entrada</th><th>Motivo / nota do trader</th></tr></thead>
             <tbody>
               {entries.map(([k, v]) => (
                 <tr key={k} style={v.featured ? { background: "rgba(214,164,69,.10)" } : undefined}>
-                  <td><button className="ad-btn sm" style={{ padding: "2px 8px", background: v.featured ? "var(--gold)" : "transparent", color: v.featured ? "#1a1206" : "var(--gold)", border: "1px solid var(--gold)" }} onClick={() => setFeatured(k)}>★</button></td>
+                  <td><button className="ad-btn sm" disabled={busyTicker != null} style={{ padding: "2px 8px", background: v.featured ? "var(--gold)" : "transparent", color: v.featured ? "#1a1206" : "var(--gold)", border: "1px solid var(--gold)" }} onClick={() => setFeatured(k)}>{busyTicker === v.ticker ? "…" : "★"}</button></td>
                   <td className="ad-tk">{v.ticker}</td>
                   <td className="ad-nm">{v.name}</td>
                   <td style={{ fontFamily: "'IBM Plex Mono',monospace", color: v.probUp >= 55 ? "#2FA37A" : v.probUp <= 45 ? "#C8553D" : "#D6A445" }}>{v.probUp != null ? v.probUp + "%" : "—"}</td>

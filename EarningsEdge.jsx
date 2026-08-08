@@ -738,7 +738,6 @@ export default function EarningsEdge() {
         <div className="ee-quicksel">
           <span>Selecionar:</span>
           <button onClick={selectNext7}>próximos 7 dias</button>
-          <button onClick={selectLast7}>últimos 7 dias</button>
         </div>
 
         <button className="ee-legend-toggle" onClick={() => setShowLegend((s) => !s)}>
