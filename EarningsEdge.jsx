@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect, useRef } from "react";
+import { FEATURED_MAX, canFeature } from "./src/shared.js";
 
 // ---------- helpers ----------
 const clamp = (x, lo, hi) => Math.max(lo, Math.min(hi, x));
@@ -374,6 +375,33 @@ export default function EarningsEdge() {
     const on = !selected.has(ticker);
     setSelected((prev) => { const n = new Set(prev); on ? n.add(ticker) : n.delete(ticker); return n; });
     if (typeof it === "object") publishToSite(it, on); // selecionar = mostrar no site; desselecionar = tirar
+  };
+
+  // Escolha do trader (★): até FEATURED_MAX ações em destaque no topo do site.
+  const [featured, setFeatured] = useState(() => new Set());
+  useEffect(() => {
+    const token = localStorage.getItem("ee_admin_token");
+    if (!token) return;
+    fetch("/api/picks/all", { cache: "no-store", headers: { Authorization: "Bearer " + token } })
+      .then((r) => r.json())
+      .then((all) => setFeatured(new Set(Object.entries(all || {}).filter(([, v]) => v && v.featured).map(([k]) => k))))
+      .catch(() => {});
+  }, []);
+  const toggleFeatured = async (it) => {
+    const token = localStorage.getItem("ee_admin_token");
+    if (!token) { alert("Faz login no admin primeiro."); return; }
+    const ticker = it.ticker;
+    const turningOn = !featured.has(ticker);
+    if (!canFeature(featured.has(ticker), featured.size)) { alert(`Máximo de ${FEATURED_MAX} destaques. Tira um primeiro.`); return; }
+    try {
+      const all = await (await fetch("/api/picks/all", { cache: "no-store", headers: { Authorization: "Bearer " + token } })).json();
+      const cal = calendar.find((c) => c.ticker === ticker && !c.past);
+      const base = all[ticker] || pickFromItem(it, cal, {}); // se ainda não publicada, publica agora
+      all[ticker] = { ...base, featured: turningOn, show: true };
+      await fetch("/api/picks", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + token }, body: JSON.stringify({ picks: all }) });
+      setFeatured((prev) => { const n = new Set(prev); turningOn ? n.add(ticker) : n.delete(ticker); return n; });
+      if (turningOn) setSelected((prev) => new Set(prev).add(ticker));
+    } catch (e) { alert("Falhou: " + (e.message || e)); }
   };
 
   const [calendar, setCalendar] = useState([]);
@@ -929,6 +957,9 @@ export default function EarningsEdge() {
               item={item}
               weights={weights}
               rank={rankMap[item.id]}
+              featured={featured.has(item.ticker)}
+              featCount={featured.size}
+              onFeature={() => toggleFeatured(item)}
               onRefresh={() => refreshLive(item)}
               onResearch={(type) => runResearch(item, type)}
               onRemove={() => remove(item.id)}
@@ -1393,7 +1424,7 @@ function NewsBlock({ news, tally, method }) {
   );
 }
 
-function ResultCard({ item, weights, rank, onRefresh, onResearch, onRemove }) {
+function ResultCard({ item, weights, rank, featured, featCount, onFeature, onRefresh, onResearch, onRemove }) {
   // computeStrategyScore só alimenta a análise de fatores (contexto) — a decisão vem do EV.
   const strategy = useMemo(() => computeStrategyScore(item, weights), [item, weights]);
   const { factors } = strategy;
@@ -1496,6 +1527,12 @@ function ResultCard({ item, weights, rank, onRefresh, onResearch, onRemove }) {
           </div>
         </div>
         <div className="ee-meta">
+          <button
+            className={"ee-featbtn" + (featured ? " on" : "")}
+            onClick={onFeature}
+            title={featured ? "Remover dos destaques" : `Destacar no topo do site (até ${FEATURED_MAX})`}
+            disabled={!featured && featCount >= FEATURED_MAX}
+          >★ {featured ? "em destaque" : "destaque"}</button>
           {item.earningsDate && <div>Resultados: <b>{item.earningsDate}</b></div>}
           {item.impliedMove != null && <div>Mov. implícito: <b>±{item.impliedMove.toFixed(1)}%</b></div>}
         </div>
@@ -1802,6 +1839,10 @@ const CSS = `
 .ee-card-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:18px;padding-right:24px;}
 .ee-card-id{display:flex;align-items:flex-start;gap:11px;}
 .ee-rankbadge{font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--gold);background:var(--ink);border:1px solid var(--line);border-radius:6px;padding:3px 7px;margin-top:3px;}
+.ee-featbtn{font-family:'Space Grotesk',sans-serif;font-size:12px;font-weight:600;color:var(--gold);background:transparent;border:1px solid var(--gold);border-radius:6px;padding:4px 10px;cursor:pointer;margin-bottom:4px;transition:background .12s,color .12s;}
+.ee-featbtn:hover:not(:disabled){background:rgba(214,164,69,.15);}
+.ee-featbtn.on{background:var(--gold);color:#1a1206;}
+.ee-featbtn:disabled{opacity:.4;cursor:not-allowed;}
 .ee-ticker{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:26px;letter-spacing:-.01em;}
 .ee-name{color:var(--muted);font-size:13px;margin-top:2px;}
 .ee-meta{text-align:right;font-size:12px;color:var(--muted);font-family:'IBM Plex Mono',monospace;line-height:1.7;}

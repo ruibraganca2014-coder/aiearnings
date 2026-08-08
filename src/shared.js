@@ -27,6 +27,8 @@ export function fmtName(s) {
 }
 // Escolha(s) do trader: picks marcadas ★ (featured) e publicadas (show), ordenadas por entrada, no máx. `max`.
 export const FEATURED_MAX = 3;
+// Pode alternar o ★? Desligar é sempre permitido; ligar só se ainda houver espaço (< max).
+export const canFeature = (isOn, count, max = FEATURED_MAX) => isOn || count < max;
 export const featuredList = (picks, max = FEATURED_MAX) =>
   Object.values(picks || {})
     .filter((p) => p && p.featured && p.show)

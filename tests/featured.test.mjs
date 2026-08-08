@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { featuredList, FEATURED_MAX } from "../src/shared.js";
+import { featuredList, FEATURED_MAX, canFeature } from "../src/shared.js";
 
 // Questões individuais para a selecção das "Escolhas do trader" (até 3, ★ + publicadas).
 const mk = (over) => ({ ticker: "X", featured: true, show: true, ...over });
@@ -44,5 +44,25 @@ describe("featuredList", () => {
 
   it("FEATURED_MAX é 3", () => {
     expect(FEATURED_MAX).toBe(3);
+  });
+});
+
+describe("canFeature (botão ★ até 3)", () => {
+  it("permite ligar quando há espaço (count < max)", () => {
+    expect(canFeature(false, 0)).toBe(true);
+    expect(canFeature(false, 2)).toBe(true);
+  });
+
+  it("bloqueia ligar quando já está no máximo", () => {
+    expect(canFeature(false, 3)).toBe(false);
+  });
+
+  it("permite sempre desligar, mesmo no máximo", () => {
+    expect(canFeature(true, 3)).toBe(true);
+  });
+
+  it("respeita um max personalizado", () => {
+    expect(canFeature(false, 1, 1)).toBe(false);
+    expect(canFeature(false, 0, 1)).toBe(true);
   });
 });

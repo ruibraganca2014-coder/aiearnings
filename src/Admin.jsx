@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useRef } from "react";
 import EarningsEdge from "../EarningsEdge.jsx";
 import { getToken, setToken, clearToken, fetchAll, savePicks, login, fetchPositions, savePositions, fetchPrices, daysBetween, fetchHistory, saveHistory, extractDoc, fetchEmails, fetchSettings, saveSettings, uploadLedger } from "./picks.js";
 import { TRADES } from "./trades.js";
-import { WD, exchOf, fmtDay, FEATURED_MAX } from "./shared.js";
+import { WD, exchOf, fmtDay, FEATURED_MAX, canFeature } from "./shared.js";
 
 const emptyRec = () => ({ type: "reaction", ticker: "", name: "", date: new Date().toISOString().slice(0, 10), pct: "", pnl: "", predicted: "SUBIR", probUp: "", nota: "" });
 
@@ -276,7 +276,7 @@ function DestaqueAdmin({ token, onAuthFail }) {
   const setFeatured = async (key) => {
     const turningOn = !picks[key].featured;
     const featCount = Object.values(picks).filter((v) => v.featured).length;
-    if (turningOn && featCount >= FEATURED_MAX) { alert(`Máximo de ${FEATURED_MAX} escolhas do trader. Desmarca uma primeiro.`); return; }
+    if (!canFeature(picks[key].featured, featCount)) { alert(`Máximo de ${FEATURED_MAX} escolhas do trader. Desmarca uma primeiro.`); return; }
     const next = {}; for (const [k, v] of Object.entries(picks)) next[k] = { ...v, featured: k === key ? turningOn : v.featured };
     persist(next);
     if (!turningOn) return;
