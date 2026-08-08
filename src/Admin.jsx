@@ -45,7 +45,16 @@ function Curadoria({ token, onAuthFail }) {
 
   const set = (tk, patch, meta) => {
     const cur = picks[tk] || {};
-    const next = { ...picks, [tk]: { ...meta, ...cur, ...patch, ticker: tk } };
+    let next = { ...picks, [tk]: { ...meta, ...cur, ...patch, ticker: tk } };
+    // regra: só 1 SUBIR por dia — ao marcar SUBIR, limpa o SUBIR de outra ação do mesmo dia
+    if (patch.reco === "SUBIR") {
+      const day = next[tk].entryISO || next[tk].date;
+      for (const k of Object.keys(next)) {
+        if (k !== tk && next[k].reco === "SUBIR" && (next[k].entryISO || next[k].date) === day) {
+          next = { ...next, [k]: { ...next[k], reco: "" } };
+        }
+      }
+    }
     setPicks(next);
     setSaved(false);
     savePicks(token, next).then(() => setSaved(true)).catch((e) => { if (String(e.message) === "401") onAuthFail(); });
@@ -85,7 +94,7 @@ function Curadoria({ token, onAuthFail }) {
     <div>
       <div className="ad-bar">
         <b>{rows.length}</b> próximos · <b>{published}</b> publicados no site
-        <span className="ad-muted"> · escolhe ★ para mostrar no site e define a previsão (subir/descer) · </span>
+        <span className="ad-muted"> · escolhe ★ para mostrar e define a previsão · <b>só 1 SUBIR por dia</b> · </span>
         <span style={{ color: saved ? "#2FA37A" : "#D6A445" }}>{saved ? "✓ guardado" : "a guardar…"}</span>
       </div>
       {groups.map((grp) => (
