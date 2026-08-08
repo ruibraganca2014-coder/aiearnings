@@ -910,7 +910,7 @@ export const CSS = `
 .ts-predtag{font-family:'IBM Plex Mono',monospace;font-size:10.5px;}
 .ts-prow--info{opacity:.72;}
 .ts-aitag{font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:var(--gold);border:1px solid var(--gold);border-radius:4px;padding:0 4px;vertical-align:middle;letter-spacing:.05em;}
-.ts-note{margin-top:16px;background:rgba(214,164,69,.1);border:1px solid var(--line);border-radius:10px;padding:12px 14px;font-size:12.5px;color:#f0d9a8;line-height:1.5;}
+.ts-note{margin-top:16px;background:rgba(47,163,122,.1);border:1px solid rgba(47,163,122,.35);border-radius:10px;padding:12px 14px;font-size:12.5px;color:#8fe0bf;line-height:1.5;}
 .ts-herocta{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-bottom:14px;}
 .ts-btnghost{background:transparent!important;color:var(--gold)!important;border:1px solid var(--gold);}
 .ts-steps{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px;}
