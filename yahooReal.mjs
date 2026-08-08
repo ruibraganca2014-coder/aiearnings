@@ -114,7 +114,21 @@ const UNIVERSE = {
   // Bruxelas (.BR)
   "ABI.BR":"consumer","KBC.BR":"finance","UCB.BR":"health","SOLB.BR":"minerals","GBLB.BR":"finance",
   // Dublin (.IR) · Estocolmo (.ST)
-  "RYA.IR":"consumer","KRZ.IR":"ai","ERIC-B.ST":"networking","INVE-B.ST":"finance",
+  "RYA.IR":"consumer","KRZ.IR":"ai","ERIC-B.ST":"networking","INVE-B.ST":"finance","VOLV-B.ST":"ev","ATCO-A.ST":"industrial","SEB-A.ST":"finance","HM-B.ST":"consumer",
+  // Viena (.VI) · Helsínquia (.HE) · Atenas (.AT)
+  "OMV.VI":"powergrid","EBS.VI":"finance","VOE.VI":"minerals","VER.VI":"powergrid","VIG.VI":"finance",
+  "NOKIA.HE":"networking","KNEBV.HE":"industrial","FORTUM.HE":"powergrid","NESTE.HE":"powergrid","SAMPO.HE":"finance","UPM.HE":"minerals","STERV.HE":"minerals",
+  "OPAP.AT":"consumer","ETE.AT":"finance","ALPHA.AT":"finance","MYTIL.AT":"industrial","PPC.AT":"powergrid",
+  // Oslo (.OL) · Copenhaga (.CO)
+  "EQNR.OL":"powergrid","DNB.OL":"finance","TEL.OL":"ai","MOWI.OL":"consumer","NHY.OL":"minerals","AKRBP.OL":"powergrid",
+  "NOVO-B.CO":"health","MAERSK-B.CO":"industrial","DSV.CO":"industrial","ORSTED.CO":"solar","CARL-B.CO":"consumer","NZYM-B.CO":"health","VWS.CO":"solar",
+  // Singapura (.SI) · Tóquio (.T) · Hong Kong (.HK)
+  "D05.SI":"finance","O39.SI":"finance","U11.SI":"finance","Z74.SI":"ai","C6L.SI":"consumer",
+  "7203.T":"ev","6758.T":"consumer","9984.T":"ai","6861.T":"industrial","8306.T":"finance","6501.T":"industrial","7974.T":"gaming","9432.T":"ai",
+  "0700.HK":"ai","9988.HK":"ai","0939.HK":"finance","1299.HK":"finance","0005.HK":"finance","3690.HK":"consumer","1211.HK":"ev","0941.HK":"ai",
+  // Toronto (.TO) · Austrália (.AX)
+  "SHOP.TO":"cloud","RY.TO":"finance","TD.TO":"finance","ENB.TO":"powergrid","CNR.TO":"industrial","BN.TO":"finance","CNQ.TO":"powergrid",
+  "BHP.AX":"minerals","CBA.AX":"finance","CSL.AX":"health","NAB.AX":"finance","WBC.AX":"finance","FMG.AX":"minerals","WES.AX":"consumer",
 };
 
 // mapeia setor Yahoo → tema visual da app (para o ponto colorido)
@@ -160,6 +174,12 @@ const EXCHANGES = {
   BR: { tz: "Europe/Brussels", open: 540, close: 1050, label: "Bruxelas" },// 09:00-17:30
   IR: { tz: "Europe/Dublin", open: 480, close: 990, label: "Dublin" },     // 08:00-16:30
   ST: { tz: "Europe/Stockholm", open: 540, close: 1050, label: "Estocolmo" },// 09:00-17:30
+  VI: { tz: "Europe/Vienna", open: 540, close: 1050, label: "Viena" },     // 09:00-17:30
+  HE: { tz: "Europe/Helsinki", open: 600, close: 1110, label: "Helsínquia" },// 10:00-18:30
+  AT: { tz: "Europe/Athens", open: 600, close: 1040, label: "Atenas" },    // 10:00-17:20
+  OL: { tz: "Europe/Oslo", open: 540, close: 980, label: "Oslo" },         // 09:00-16:20
+  CO: { tz: "Europe/Copenhagen", open: 540, close: 1020, label: "Copenhaga" },// 09:00-17:00
+  SI: { tz: "Asia/Singapore", open: 540, close: 1020, label: "Singapura" },// 09:00-17:00
   TO: { tz: "America/Toronto", open: 570, close: 960, label: "Toronto" },  // 09:30-16:00
   SA: { tz: "America/Sao_Paulo", open: 600, close: 1020, label: "Brasil" },// 10:00-17:00
   NS: { tz: "Asia/Kolkata", open: 555, close: 930, label: "Índia" },       // 09:15-15:30
