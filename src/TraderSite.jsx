@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from "react";
-import { fetchPublished, fetchPositions, fetchPrices, daysBetween, fetchLedger, subscribeEmail, fetchHistory } from "./picks.js";
+import { fetchPublished, fetchPositions, fetchPrices, daysBetween, fetchLedger, subscribeEmail, fetchHistory, fetchSettings } from "./picks.js";
 import { WD, exchOf, fmtDay } from "./shared.js";
 
 const eur = (n) => (n < 0 ? "−" : "") + "€" + Math.abs(Math.round(n)).toLocaleString("pt-PT");
@@ -327,8 +327,9 @@ function HistoricoCalendario() {
 export default function TraderSite() {
   const [picks, setPicks] = useState({});
   const [hist, setHist] = useState([]);
+  const [settings, setSettings] = useState({});
   useEffect(() => {
-    const load = () => { fetchPublished().then(setPicks); fetchHistory().then((h) => setHist(Array.isArray(h) ? h : [])); };
+    const load = () => { fetchPublished().then(setPicks); fetchHistory().then((h) => setHist(Array.isArray(h) ? h : [])); fetchSettings().then(setSettings); };
     load();
     const onVis = () => { if (!document.hidden) load(); };
     window.addEventListener("focus", load);
@@ -339,14 +340,15 @@ export default function TraderSite() {
   const stats = useMemo(() => {
     const h = hist.filter((r) => r.pct != null);
     const n = h.length;
-    const mov = n ? h.reduce((a, r) => a + Math.abs(r.pct), 0) / n : 0;
+    const subiu = n ? Math.round(h.filter((r) => r.pct > 0).length / n * 100) : 0; // % das ações que subiram nos resultados
     const avgPct = n ? h.reduce((a, r) => a + r.pct, 0) / n : 0;
-    const lucro = hist.reduce((a, r) => a + (Number(r.pnl) || 0), 0);
     const pred = h.filter((r) => r.predicted && r.predicted !== "NEUTRO");
     const hits = pred.filter((r) => (r.predicted === "SUBIR" && r.pct > 0) || (r.predicted === "DESCER" && r.pct < 0)).length;
     const acerto = pred.length ? Math.round(hits / pred.length * 100) : null;
-    return { n, mov, avgPct, lucro, acerto };
+    return { n, subiu, avgPct, acerto };
   }, [hist]);
+  const totalPL = Number(settings.totalPL) || 0; // Total L/P real do DEGIRO (€, definido no admin)
+  const saldo = Number(settings.saldo) || 0; // Saldo da conta DEGIRO (€)
   return (
     <div className="ts-root">
       <style>{CSS}</style>
@@ -373,10 +375,10 @@ export default function TraderSite() {
         <h1>Resultados trimestrais, descodificados semana a semana</h1>
         <p>Probabilidade de uma ação <b>subir ou descer</b> nos resultados trimestrais, por análise de IA sobre dados de mercado (EUA + Europa). Não é aconselhamento financeiro — é leitura de probabilidades.</p>
         <div className="ts-herostats">
-          {stats.acerto != null && <div><b>{stats.acerto}%</b><span>acerto IA</span></div>}
-          <div><b>{stats.n}</b><span>análises</span></div>
-          <div><b>±{stats.mov.toFixed(1)}%</b><span>mov. médio</span></div>
-          <div><b style={{ color: stats.lucro >= 0 ? "#2FA37A" : "#C8553D" }}>{stats.lucro >= 0 ? "+$" : "-$"}{Math.abs(Math.round(stats.lucro))}</b><span>resultado</span></div>
+          {stats.acerto != null && <div><b>{stats.acerto}%</b><span>acerto das previsões</span></div>}
+          <div><b>{stats.n}</b><span>resultados analisados</span></div>
+          <div><b>{stats.subiu}%</b><span>que subiram</span></div>
+          {totalPL !== 0 && <div><b style={{ color: totalPL >= 0 ? "#2FA37A" : "#C8553D" }}>{totalPL >= 0 ? "+" : ""}{eur(totalPL)}</b><span>resultado total</span></div>}
         </div>
         <div className="ts-herocta">
           <a href="#site-metodo" className="ts-btn">Ver o método</a>
@@ -392,9 +394,10 @@ export default function TraderSite() {
         <p className="ts-lead">Desempenho das previsões de direção (IA) sobre o histórico. São <b>probabilidades, não garantias</b> — amostra pequena, alta variância.</p>
         <div className="ts-statgrid">
           <div className="ts-stat"><b style={{ color: "#D6A445" }}>{stats.acerto != null ? stats.acerto + "%" : "—"}</b><span>acerto das previsões</span><small>previu a direção certa</small></div>
-          <div className="ts-stat"><b>{stats.n}</b><span>apresentações analisadas</span><small>no histórico</small></div>
-          <div className="ts-stat"><b>±{stats.mov.toFixed(1)}%</b><span>movimento médio</span><small>quanto mexeram nos resultados</small></div>
-          <div className="ts-stat"><b style={{ color: stats.lucro >= 0 ? "#2FA37A" : "#C8553D" }}>{stats.lucro >= 0 ? "+$" : "-$"}{Math.abs(Math.round(stats.lucro))}</b><span>resultado</span><small>média {stats.avgPct >= 0 ? "+" : ""}{stats.avgPct.toFixed(1)}%/trade</small></div>
+          <div className="ts-stat"><b>{stats.n}</b><span>resultados analisados</span><small>apresentações no histórico</small></div>
+          <div className="ts-stat"><b>{stats.subiu}%</b><span>que subiram</span><small>subiram nos resultados</small></div>
+          <div className="ts-stat"><b style={{ color: totalPL >= 0 ? "#2FA37A" : "#C8553D" }}>{totalPL >= 0 ? "+" : ""}{eur(totalPL)}</b><span>resultado total (DEGIRO)</span><small>média {stats.avgPct >= 0 ? "+" : ""}{stats.avgPct.toFixed(1)}%/trade</small></div>
+          {saldo !== 0 && <div className="ts-stat"><b>{eur(saldo)}</b><span>saldo da conta</span><small>capital atual (DEGIRO)</small></div>}
         </div>
         <div className="ts-note">Resultados passados não garantem futuros. Não é aconselhamento financeiro; é análise probabilística assistida por IA.</div>
       </section>

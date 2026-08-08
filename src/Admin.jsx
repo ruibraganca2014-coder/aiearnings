@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import EarningsEdge from "../EarningsEdge.jsx";
-import { getToken, setToken, clearToken, fetchAll, savePicks, login, fetchPositions, savePositions, fetchPrices, daysBetween, fetchLedger, saveLedger, fetchEmails, fetchHistory, saveHistory, extractDoc, fetchTrades, saveTrades } from "./picks.js";
+import { getToken, setToken, clearToken, fetchAll, savePicks, login, fetchPositions, savePositions, fetchPrices, daysBetween, fetchLedger, saveLedger, fetchEmails, fetchHistory, saveHistory, extractDoc, fetchTrades, saveTrades, fetchSettings, saveSettings } from "./picks.js";
 import { TRADES } from "./trades.js";
 import { WD, exchOf, fmtDay } from "./shared.js";
 
@@ -273,11 +273,20 @@ function RendaAdmin({ token, onAuthFail }) {
   const [emails, setEmails] = useState([]);
   const [f, setF] = useState({ type: "deposit", amount: "", date: today, note: "" });
   const [saved, setSaved] = useState(true);
+  const [totalPL, setTotalPL] = useState("");
+  const [saldo, setSaldo] = useState("");
+  const [plSaved, setPlSaved] = useState(true);
 
   useEffect(() => {
     fetchLedger().then(setLed);
+    fetchSettings().then((s) => { setTotalPL(s.totalPL != null ? String(s.totalPL) : ""); setSaldo(s.saldo != null ? String(s.saldo) : ""); });
     fetchEmails(token).then(setEmails).catch((e) => { if (String(e.message) === "401") onAuthFail(); });
   }, [token]);
+
+  const savePL = () => {
+    setPlSaved(false);
+    saveSettings(token, { totalPL: totalPL === "" ? null : Number(totalPL), saldo: saldo === "" ? null : Number(saldo) }).then(() => setPlSaved(true)).catch((e) => { if (String(e.message) === "401") onAuthFail(); });
+  };
 
   const persist = (next) => {
     setLed(next); setSaved(false);
@@ -298,6 +307,15 @@ function RendaAdmin({ token, onAuthFail }) {
 
   return (
     <div>
+      <div className="ad-form" style={{ alignItems: "center" }}>
+        <b style={{ fontSize: 13 }}>Total L/P €:</b>
+        <input className="ad-note" style={{ maxWidth: 120 }} type="number" step="0.01" placeholder="ex. 1153.15" value={totalPL} onChange={(e) => setTotalPL(e.target.value)} />
+        <b style={{ fontSize: 13 }}>Saldo €:</b>
+        <input className="ad-note" style={{ maxWidth: 120 }} type="number" step="0.01" placeholder="ex. 2776.88" value={saldo} onChange={(e) => setSaldo(e.target.value)} />
+        <button className="ad-btn sm" onClick={savePL}>Guardar</button>
+        <span style={{ color: plSaved ? "#2FA37A" : "#D6A445", fontSize: 12 }}>{plSaved ? "✓" : "…"}</span>
+        <span className="ad-muted" style={{ fontSize: 12 }}>aparece no site como "resultado total". Copia do teu DEGIRO.</span>
+      </div>
       <div className="ad-bar">Plano de capital · depositado <b>€{Math.round(dep)}</b> · retirado <b>€{Math.round(wit)}</b> · saldo <b>€{Math.round(bal)}</b> · <span style={{ color: saved ? "#2FA37A" : "#D6A445" }}>{saved ? "✓ guardado" : "a guardar…"}</span></div>
 
       <div className="ad-form">
