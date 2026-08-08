@@ -1,20 +1,24 @@
 import { useState, useEffect, useMemo, useRef } from "react";
-import { fetchPublished, fetchPositions, fetchPrices, daysBetween, subscribeEmail, fetchHistory, fetchSettings } from "./picks.js";
+import { fetchPublished, fetchPositions, fetchPrices, daysBetween, subscribeEmail, fetchHistory, fetchSettings, fetchLedger, fetchTape } from "./picks.js";
 import { WD, exchOf, fmtDay } from "./shared.js";
 
-const eur = (n) => (n < 0 ? "−" : "") + "€" + Math.abs(Math.round(n)).toLocaleString("pt-PT");
+export const eur = (n) => (n < 0 ? "−" : "") + "€" + Math.abs(Math.round(n)).toLocaleString("pt-PT");
 const recoColor = (r) => r === "SUBIR" ? "#2FA37A" : r === "DESCER" ? "#C8553D" : "#D6A445"; // SUBIR verde · DESCER vermelho · NEUTRO dourado
-const probColor = (v) => v == null ? "#8CA3B3" : v >= 55 ? "#2FA37A" : v <= 45 ? "#C8553D" : "#D6A445"; // cor pela probabilidade de subir
+export const probColor = (v) => v == null ? "#8CA3B3" : v >= 55 ? "#2FA37A" : v <= 45 ? "#C8553D" : "#D6A445"; // cor pela probabilidade de subir
 
 const PALETTE = ["#2FA37A", "#D6A445", "#4F86C6", "#C8553D", "#8E7CC3", "#5BA3A0", "#C77DAB", "#B5843A"];
 const colorFor = (s) => PALETTE[[...String(s || "x")].reduce((a, c) => a + c.charCodeAt(0), 0) % PALETTE.length];
-function Mono({ ticker, sector }) {
+export function Mono({ ticker, sector }) {
   const init = String(ticker || "").replace(/\..*/, "").slice(0, 3);
   return <span className="ts-mono" style={{ background: colorFor(sector || ticker) }}>{init}</span>;
 }
-function Spark({ hist, marks }) {
+const SPARK_PER = [["semana", "Sem"], ["mes", "Mês"], ["3m", "3M"], ["6m", "6M"], ["ano", "Ano"]];
+const SPARK_N = { semana: 5, mes: 22, "3m": 63, "6m": 126, ano: 260 };
+export function Spark({ hist, marks }) {
+  const [per, setPer] = useState("ano");
   if (!hist || hist.length < 2) return null;
-  const data = hist.slice(-160);
+  const data = hist.slice(-SPARK_N[per]);
+  if (data.length < 2) return null;
   const cs = data.map((x) => x.c), min = Math.min(...cs), max = Math.max(...cs), W = 300, H = 70;
   const px = (i) => (i * W / (data.length - 1));
   const py = (c) => H - (c - min) / (max - min || 1) * H;
@@ -22,10 +26,94 @@ function Spark({ hist, marks }) {
   const up = cs[cs.length - 1] >= cs[0];
   const markSet = new Set(marks || []);
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="ts-spark" preserveAspectRatio="none">
-      {data.map((x, i) => markSet.has(x.d) ? <line key={i} x1={px(i)} y1="0" x2={px(i)} y2={H} stroke="#D6A445" strokeWidth="1" strokeDasharray="2 3" opacity="0.5" /> : null)}
-      <path d={path} fill="none" stroke={up ? "#2FA37A" : "#C8553D"} strokeWidth="1.6" />
-    </svg>
+    <div className="ts-sparkwrap">
+      <svg viewBox={`0 0 ${W} ${H}`} className="ts-spark" preserveAspectRatio="none">
+        {data.map((x, i) => markSet.has(x.d) ? <line key={i} x1={px(i)} y1="0" x2={px(i)} y2={H} stroke="#D6A445" strokeWidth="1" strokeDasharray="2 3" opacity="0.5" /> : null)}
+        <path d={path} fill="none" stroke={up ? "#2FA37A" : "#C8553D"} strokeWidth="1.6" />
+      </svg>
+      <div className="ts-sparkbtns">
+        {SPARK_PER.map(([k, l]) => <button key={k} className={per === k ? "on" : ""} onClick={() => setPer(k)}>{l}</button>)}
+      </div>
+    </div>
+  );
+}
+
+// navegação para a página de uma ação
+export const goStock = (t) => { if (t) window.location.hash = "#stock/" + String(t).toUpperCase(); };
+
+// curva de equity do método (capital base + P/L acumulado)
+function EquityChart({ equity }) {
+  if (!equity || equity.length < 2) return null;
+  const vs = equity.map((x) => x.saldo), min = Math.min(...vs), max = Math.max(...vs), W = 600, H = 130;
+  const px = (i) => (i * W / (equity.length - 1));
+  const py = (v) => H - (v - min) / (max - min || 1) * H;
+  const path = equity.map((x, i) => (i ? "L" : "M") + px(i).toFixed(1) + " " + py(x.saldo).toFixed(1)).join(" ");
+  const area = path + ` L ${W} ${H} L 0 ${H} Z`;
+  const up = vs[vs.length - 1] >= vs[0];
+  const col = up ? "#2FA37A" : "#C8553D";
+  return (
+    <div className="ts-equity">
+      <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className="ts-equitysvg">
+        <defs><linearGradient id="eqg" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={col} stopOpacity="0.28" /><stop offset="100%" stopColor={col} stopOpacity="0" /></linearGradient></defs>
+        <path d={area} fill="url(#eqg)" stroke="none" />
+        <path d={path} fill="none" stroke={col} strokeWidth="2" />
+      </svg>
+      <div className="ts-equityax"><span>{eur(min)}</span><span>{eur(max)}</span></div>
+    </div>
+  );
+}
+
+// barra inferior de cotações (índices + ações) a rolar
+function TickerTape({ items }) {
+  if (!items || !items.length) return null;
+  const NAMES = { "^GSPC": "S&P 500", "^IXIC": "Nasdaq", "^DJI": "Dow Jones", "EURUSD=X": "EUR/USD" };
+  const row = items.map((q) => {
+    const up = (q.change ?? 0) >= 0;
+    const label = NAMES[q.symbol] || q.symbol;
+    const isIdx = q.symbol.startsWith("^") || q.symbol.includes("=");
+    return (
+      <span className={"ts-tapeitem" + (isIdx ? " idx" : "")} key={q.symbol} onClick={() => !isIdx && goStock(q.symbol)}>
+        <b>{label}</b>
+        <span>{q.price != null ? q.price.toLocaleString("pt-PT", { maximumFractionDigits: 2 }) : "—"}</span>
+        {q.change != null && <em style={{ color: up ? "#2FA37A" : "#C8553D" }}>{up ? "▲" : "▼"} {Math.abs(q.change).toFixed(2)}%</em>}
+      </span>
+    );
+  });
+  return (
+    <div className="ts-tape">
+      <div className="ts-tapetrack">{row}{row}</div>
+    </div>
+  );
+}
+
+// Escolha do trader — a pick que o admin marcou com ★. Card grande no topo, clicável.
+function TraderPick({ pick }) {
+  if (!pick) return null;
+  const p = pick;
+  return (
+    <section className="ts-sec ts-tpsec">
+      <div className="ts-tpcard" style={{ borderColor: probColor(p.probUp) }} onClick={() => goStock(p.ticker)}>
+        <div className="ts-tphead">
+          <span className="ts-tplabel">★ Escolha do trader</span>
+          {p.probUp != null && <span className="ts-ftbadge" style={{ background: probColor(p.probUp) }}>↑ {p.probUp}% subir</span>}
+        </div>
+        <div className="ts-tpbody">
+          <div className="ts-tpleft">
+            <div className="ts-tptop"><Mono ticker={p.ticker} sector={p.sector} /><div><div className="ts-tptic">{p.ticker} <span className="ts-aitag">IA</span></div><div className="ts-tpname">{p.name}{p.sector && p.sector !== "other" && <span className="ts-ftsect">{p.sector}</span>}</div></div></div>
+            {p.nota && <div className="ts-tpnota">“{p.nota}”</div>}
+            <div className="ts-tpmetrics">
+              {p.probUp != null && <div><span>Prob. subir</span><b style={{ color: probColor(p.probUp) }}>{p.probUp}%</b></div>}
+              {p.ev != null && <div><span>Valor esperado</span><b style={{ color: p.ev >= 0 ? "#2FA37A" : "#C8553D" }}>{p.ev >= 0 ? "+" : ""}{p.ev}%</b></div>}
+              {p.price != null && <div><span>Preço</span><b>${p.price}</b></div>}
+              {(p.earningsDate || p.entryISO) && <div><span>{p.earningsDate ? "Resultados" : "Entrar"}</span><b>{fmtDay(p.earningsDate || p.entryISO)}</b></div>}
+              {p.gapAvg != null && <div><span>Gap médio</span><b style={{ color: p.gapAvg >= 0 ? "#2FA37A" : "#C8553D" }}>{p.gapAvg >= 0 ? "+" : ""}{p.gapAvg}%{p.gapPctUp != null ? ` · ${p.gapPctUp}%↑` : ""}</b></div>}
+            </div>
+          </div>
+          {p.history && p.history.length > 1 && <div className="ts-tpchart"><Spark hist={p.history} marks={p.earningsMarks} /></div>}
+        </div>
+        <div className="ts-tpfoot">Ver análise completa → <span className="ts-tpnote">Probabilidade/opinião, não recomendação.</span></div>
+      </div>
+    </section>
   );
 }
 
@@ -83,7 +171,6 @@ function Featured({ picks, suspenso }) {
                 {p.history && <Spark hist={p.history} marks={p.earningsMarks} />}
                 {p.probUp != null && <div><span>Probabilidade de subir</span><b style={{ color: p.probUp >= 55 ? "#2FA37A" : p.probUp <= 45 ? "#C8553D" : "#D6A445" }}>{p.probUp}%</b></div>}
                 {p.ev != null && <div><span>Valor esperado</span><b style={{ color: p.ev >= 0 ? "#2FA37A" : "#C8553D" }}>{p.ev >= 0 ? "+" : ""}{p.ev}%/trade</b></div>}
-                <div className="ts-ftwarn">⚠ Probabilidade, não garantia. Não é recomendação.</div>
               </div>
             )}
           </div>
@@ -279,9 +366,17 @@ function Newsletter() {
   );
 }
 
-function HistoricoCalendario() {
+function HistoricoCalendario({ ledger }) {
   const [rows, setRows] = useState(null); // apostados (posições fechadas / upload)
   const [mkt, setMkt] = useState([]); // mercado (não apostados) — motor
+  const [open, setOpen] = useState(null); // linha apostada expandida (accordion)
+  // trades do extrato indexados por ticker (para enriquecer a linha apostada)
+  const ledByTicker = useMemo(() => {
+    const m = {};
+    (ledger?.trades || []).forEach((t) => { if (t.ticker) (m[t.ticker] = m[t.ticker] || []).push(t); });
+    return m;
+  }, [ledger]);
+  const ledFor = (ticker, date) => { const l = ledByTicker[ticker]; if (!l) return null; return l.find((t) => t.sellDate === date) || l[0]; };
   useEffect(() => {
     const load = () => {
       fetchHistory().then(setRows);
@@ -319,17 +414,44 @@ function HistoricoCalendario() {
         {days.slice(0, 7).map((grp) => (
           <div className="ts-daycard" key={grp.day}>
             <div className="ts-dayhdr">{WD[new Date(grp.day + "T00:00:00").getDay()]} · {fmtDay(grp.day)}</div>
-            {grp.items.map((r, i) => (
-              <div className={"ts-prow" + (r.aposta ? "" : " ts-prow--info")} key={r.ticker + i}>
-                <span className="ts-ptic">{r.ticker}</span>
-                <span className="ts-pex">{r.exch || "EUA"}</span>
-                <span className="ts-pname">{r.name}</span>
-                {r.pct != null && <span style={{ color: r.pct < 0 ? "#C8553D" : "#2FA37A", fontFamily: "'IBM Plex Mono',monospace" }}>{r.pct >= 0 ? "▲ +" : "▼ "}{r.pct}%</span>}
-                {r.pnl != null && <span style={{ color: r.pnl < 0 ? "#C8553D" : "#2FA37A", fontFamily: "'IBM Plex Mono',monospace" }}>{r.pnl >= 0 ? "+€" : "−€"}{Math.abs(r.pnl)}</span>}
-                {r.aposta && r.predicted && r.predicted !== "NEUTRO" && (() => { const hit = (r.predicted === "SUBIR" && r.pct > 0) || (r.predicted === "DESCER" && r.pct < 0); return <span className="ts-predtag" title="Previsão dada nas previsões vs resultado real" style={{ color: hit ? "#2FA37A" : "#C8553D" }}>previu {r.predicted === "SUBIR" ? "↑" : "↓"} {hit ? "✓" : "✕"}</span>; })()}
-                {r.aposta ? <span className="ts-aitag" title="Análise assistida por IA">IA</span> : <span className="ts-naotag" title="Resultado do mercado — não apostado">não apostado</span>}
-              </div>
-            ))}
+            {grp.items.map((r, i) => {
+              const key = grp.day + r.ticker + i;
+              const t = r.aposta ? ledFor(r.ticker, r.date) : null;
+              const canExpand = r.aposta;
+              const isOpen = open === key;
+              return (
+                <div key={key}>
+                  <div className={"ts-prow" + (r.aposta ? "" : " ts-prow--info") + (canExpand ? " ts-prow--exp" : "")} onClick={canExpand ? () => setOpen(isOpen ? null : key) : undefined}>
+                    {canExpand && <span className={"ts-caret" + (isOpen ? " open" : "")}>▸</span>}
+                    <span className="ts-ptic">{r.ticker}</span>
+                    <span className="ts-pex">{r.exch || "EUA"}</span>
+                    <span className="ts-pname">{r.name}</span>
+                    {r.pct != null && <span style={{ color: r.pct < 0 ? "#C8553D" : "#2FA37A", fontFamily: "'IBM Plex Mono',monospace" }}>{r.pct >= 0 ? "▲ +" : "▼ "}{r.pct}%</span>}
+                    {r.pnl != null && <span style={{ color: r.pnl < 0 ? "#C8553D" : "#2FA37A", fontFamily: "'IBM Plex Mono',monospace" }}>{r.pnl >= 0 ? "+€" : "−€"}{Math.abs(r.pnl)}</span>}
+                    {r.aposta && r.predicted && r.predicted !== "NEUTRO" && (() => { const hit = (r.predicted === "SUBIR" && r.pct > 0) || (r.predicted === "DESCER" && r.pct < 0); return <span className="ts-predtag" title="Previsão dada nas previsões vs resultado real" style={{ color: hit ? "#2FA37A" : "#C8553D" }}>previu {r.predicted === "SUBIR" ? "↑" : "↓"} {hit ? "✓" : "✕"}</span>; })()}
+                    {r.aposta ? <span className="ts-aitag" title="Análise assistida por IA">IA</span> : <span className="ts-naotag" title="Resultado do mercado — não apostado">não apostado</span>}
+                  </div>
+                  {canExpand && isOpen && (
+                    <div className="ts-pexp">
+                      {t ? (
+                        <div className="ts-pexpgrid">
+                          <div><span>Compra → Venda</span><b>${t.buyPx} → ${t.sellPx}</b></div>
+                          <div><span>Quantidade</span><b>{t.qty} ações</b></div>
+                          <div><span>Dias em posição</span><b>{t.holdDays}</b></div>
+                          <div><span>Investido</span><b>{eur(t.cost)}</b></div>
+                          <div><span>Resultado</span><b style={{ color: t.pl >= 0 ? "#2FA37A" : "#C8553D" }}>{t.pl >= 0 ? "+" : ""}{eur(t.pl)} ({t.pct >= 0 ? "+" : ""}{t.pct}%)</b></div>
+                          {(t.fxBuy || t.fxSell) && <div><span>Câmbio EUR/USD C→V</span><b>{t.fxBuy || "—"} → {t.fxSell || "—"}</b></div>}
+                          <div><span>Comissão</span><b>€2 compra + €2 venda</b></div>
+                        </div>
+                      ) : <div className="ts-muted" style={{ fontSize: 12.5 }}>Detalhe do trade não disponível no extrato.</div>}
+                      {(r.probUp != null || r.predicted) && <div className="ts-pexpline"><span>Previsão dada:</span> {r.predicted ? (r.predicted === "SUBIR" ? "subir ↑" : r.predicted === "DESCER" ? "descer ↓" : "neutro") : ""}{r.probUp != null ? ` · probabilidade ${r.probUp}%` : ""}</div>}
+                      {r.nota && <div className="ts-pexpline"><span>Motivo:</span> “{r.nota}”</div>}
+                      <div className="ts-pexpline"><a href={"#stock/" + r.ticker} onClick={(e) => e.stopPropagation()}>Ver página completa da ação →</a></div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         ))}
       </div>
@@ -343,9 +465,12 @@ export default function TraderSite() {
   const [openPos, setOpenPos] = useState([]);
   const [posPrices, setPosPrices] = useState({});
   const [settings, setSettings] = useState({});
+  const [ledger, setLedger] = useState({});
+  const [tape, setTape] = useState([]);
   useEffect(() => {
     const load = () => {
       fetchPublished().then(setPicks); fetchHistory().then((h) => setHist(Array.isArray(h) ? h : [])); fetchSettings().then(setSettings);
+      fetchLedger().then((l) => setLedger(l || {}));
       fetchPositions().then((p) => { const a = Array.isArray(p) ? p : []; setOpenPos(a); fetchPrices(a.map((x) => x.ticker)).then(setPosPrices); });
     };
     load();
@@ -355,6 +480,24 @@ export default function TraderSite() {
     const id = setInterval(load, 30000); // atualiza sem recarregar
     return () => { window.removeEventListener("focus", load); document.removeEventListener("visibilitychange", onVis); clearInterval(id); };
   }, []);
+  // símbolos da barra de cotações: índices + ações do método (ledger + picks + histórico)
+  const tapeSyms = useMemo(() => {
+    const idx = ["^GSPC", "^IXIC", "^DJI", "EURUSD=X"];
+    const mine = new Set();
+    (ledger.trades || []).forEach((t) => t.ticker && mine.add(t.ticker));
+    Object.values(picks || {}).forEach((p) => p.ticker && exchOf(p.ticker) === "EUA" && mine.add(p.ticker));
+    hist.forEach((r) => r.ticker && mine.add(r.ticker));
+    return [...idx, ...[...mine].slice(0, 16)];
+  }, [ledger, picks, hist]);
+  useEffect(() => {
+    if (tapeSyms.length <= 4) return; // ainda sem ações → não mostra tape
+    const load = () => fetchTape(tapeSyms).then((t) => setTape(Array.isArray(t) ? t : []));
+    load();
+    const id = setInterval(load, 60000);
+    return () => clearInterval(id);
+  }, [tapeSyms.join(",")]);
+  const led = ledger.stats || null;
+  const featPick = useMemo(() => Object.values(picks || {}).find((p) => p.featured && p.show), [picks]);
   const stats = useMemo(() => {
     const h = hist.filter((r) => r.pct != null);
     const n = h.length;
@@ -409,6 +552,8 @@ export default function TraderSite() {
         <div className="ts-herowarn">Conteúdo informativo — indicativo, não prova de edge. Alta variância. Não é aconselhamento financeiro.</div>
       </section>
 
+      <TraderPick pick={featPick} />
+
       <section className="ts-sec ts-topstats">
         <div className="ts-statgrid">
           <div className="ts-stat"><b style={{ color: "#D6A445" }}>{stats.acerto != null ? stats.acerto + "%" : "—"}</b><span>acerto das previsões</span><small>previu a direção certa</small></div>
@@ -418,9 +563,24 @@ export default function TraderSite() {
           {saldo != null && <div className="ts-stat"><b>{eur(saldo)}</b><span>saldo da conta</span><small>capital atual (DEGIRO)</small></div>}
           {lucroMes != null && <div className="ts-stat"><b style={{ color: lucroMes >= 0 ? "#2FA37A" : "#C8553D" }}>{lucroMes >= 0 ? "+" : ""}{eur(lucroMes)}</b><span>lucro do mês</span><small>acima de {eur(capitalBase)} · retira no início do mês</small></div>}
           {plPer.map((p) => <div className="ts-stat" key={p.l}><b style={{ color: p.v > 0 ? "#2FA37A" : p.v < 0 ? "#C8553D" : "var(--tx)" }}>{p.v >= 0 ? "+" : ""}{eur(p.v)}</b><span>L/P {p.l}</span><small>ganho/perda no período</small></div>)}
+          {led && led.avgHold != null && <div className="ts-stat"><b>{led.avgHold}<small style={{ fontSize: "0.5em" }}> dias</small></b><span>tempo médio por posição</span><small>entrada → saída</small></div>}
+          {led && led.best && <div className="ts-stat" onClick={() => goStock(led.best.ticker)} style={{ cursor: led.best.ticker ? "pointer" : "default" }}><b style={{ color: "#2FA37A" }}>+{led.best.pct}%</b><span>melhor trade</span><small>{led.best.ticker || led.best.name}</small></div>}
+          {led && led.worst && <div className="ts-stat" onClick={() => goStock(led.worst.ticker)} style={{ cursor: led.worst.ticker ? "pointer" : "default" }}><b style={{ color: "#C8553D" }}>{led.worst.pct}%</b><span>pior trade</span><small>{led.worst.ticker || led.worst.name}</small></div>}
+          {led && led.avgFx != null && <div className="ts-stat"><b>{led.avgFx}</b><span>câmbio médio EUR/USD</span><small>nas operações</small></div>}
+          {led && led.netPL != null && <div className="ts-stat"><b style={{ color: led.netPL >= 0 ? "#2FA37A" : "#C8553D" }}>{led.netPL >= 0 ? "+" : ""}{eur(led.netPL)}</b><span>L/P líquido</span><small>após comissões e taxas</small></div>}
+          {led && led.totalCost != null && <div className="ts-stat"><b style={{ color: "#C8553D" }}>−{eur(led.totalCost)}</b><span>custos totais</span><small>{led.costPerTrade != null ? "≈ €" + led.costPerTrade + "/trade" : "comissões + conectividade"}</small></div>}
+          {led && led.pctStd != null && <div className="ts-stat"><b>±{led.pctStd}%</b><span>consistência</span><small>desvio por trade (menor = estável)</small></div>}
         </div>
+        {ledger.equity && ledger.equity.length > 1 && (
+          <div className="ts-equitybox">
+            <div className="ts-equityhd"><span>Curva de capital <small>(base + P/L dos trades fechados)</small></span>{led && <b style={{ color: led.totalPL >= 0 ? "#2FA37A" : "#C8553D" }}>{led.totalPL >= 0 ? "+" : ""}{eur(led.totalPL)}</b>}</div>
+            <EquityChart equity={ledger.equity} />
+          </div>
+        )}
         <div className="ts-note">Resultados passados não garantem futuros. Não é aconselhamento financeiro; é análise probabilística assistida por IA.</div>
       </section>
+
+      <Positions />
 
       <Metodo />
 
@@ -432,9 +592,7 @@ export default function TraderSite() {
         <Predictions picks={picks} suspenso={suspenso} />
       </section>
 
-      <HistoricoCalendario />
-
-      <Positions />
+      <HistoricoCalendario ledger={ledger} />
 
       <section id="site-gal" className="ts-sec">
         <h2>Galeria de earnings</h2>
@@ -482,11 +640,13 @@ export default function TraderSite() {
         </div>
         <b>Aviso legal:</b> Este site é informativo/educacional e reflete opiniões pessoais. Parte das análises é <b>assistida por inteligência artificial</b> e pode conter erros; a divulgação de IA não retira a responsabilidade editorial. <b>Não constitui aconselhamento financeiro, de investimento ou fiscal</b>, nem recomendação personalizada. Investir em instrumentos financeiros envolve risco, incluindo a perda total do capital. Resultados passados não são garantia de resultados futuros. Não sou consultor financeiro registado. Faz a tua própria análise e/ou procura aconselhamento profissional. Dados de mercado via Yahoo Finance, podem ter atrasos ou erros.
       </footer>
+
+      <TickerTape items={tape} />
     </div>
   );
 }
 
-const CSS = `
+export const CSS = `
 @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap');
 .ts-root *{box-sizing:border-box;}
 .ts-root{--ink:#0E1620;--s1:#16232F;--s2:#1E2E3C;--line:#2A3E4E;--tx:#E8EEF2;--mut:#8CA3B3;--gold:#D6A445;--grn:#2FA37A;--red:#C8553D;
@@ -541,7 +701,11 @@ const CSS = `
 .ts-feat.clik{cursor:pointer;}
 .ts-mono{display:inline-flex;align-items:center;justify-content:center;width:26px;height:20px;border-radius:5px;color:#0E1620;font-size:9.5px;font-weight:700;font-family:'IBM Plex Mono',monospace;vertical-align:middle;letter-spacing:-.02em;}
 .ts-ftsect{margin-left:8px;font-size:10px;color:var(--mut);border:1px solid var(--line);border-radius:5px;padding:1px 6px;text-transform:capitalize;}
-.ts-spark{width:100%;height:70px;background:var(--ink);border:1px solid var(--line);border-radius:8px;margin-bottom:6px;}
+.ts-spark{width:100%;height:70px;background:var(--ink);border:1px solid var(--line);border-radius:8px;}
+.ts-ftdet>.ts-sparkwrap{display:block;margin-bottom:8px;}
+.ts-sparkbtns{display:flex;gap:4px;margin-top:5px;}
+.ts-sparkbtns button{flex:1;background:transparent;border:1px solid var(--line);color:var(--mut);border-radius:5px;padding:3px 0;font-size:10px;cursor:pointer;font-family:'IBM Plex Mono',monospace;}
+.ts-sparkbtns button.on{background:var(--gold);color:#1a1206;border-color:var(--gold);font-weight:600;}
 .ts-ftana{display:flex;gap:12px;flex-wrap:wrap;margin-top:8px;font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--mut);}
 .ts-ftana b{color:var(--tx);}
 .ts-ftdet{margin-top:10px;border-top:1px solid var(--line);padding-top:10px;display:flex;flex-direction:column;gap:6px;}
@@ -597,4 +761,60 @@ const CSS = `
 .ts-footlinks a{color:var(--gold);text-decoration:none;font-size:13px;}
 .ts-footlinks a:hover{text-decoration:underline;}
 @media(max-width:560px){.ts-hero h1{font-size:28px;}}
+/* curva de equity */
+.ts-equitybox{margin-top:22px;background:var(--s1);border:1px solid var(--line);border-radius:12px;padding:16px 18px;}
+.ts-equityhd{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:10px;font-size:14px;color:var(--tx);}
+.ts-equityhd small{color:var(--mut);font-size:11.5px;}
+.ts-equityhd b{font-family:'IBM Plex Mono',monospace;font-size:18px;}
+.ts-equity{position:relative;}
+.ts-equitysvg{width:100%;height:130px;display:block;}
+.ts-equityax{display:flex;justify-content:space-between;font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:var(--mut);margin-top:4px;}
+/* barra de cotações (ticker tape) */
+.ts-root{padding-bottom:40px;}
+.ts-tape{position:fixed;left:0;right:0;bottom:0;z-index:40;height:34px;background:#0A121B;border-top:1px solid var(--line);overflow:hidden;display:flex;align-items:center;}
+.ts-tapetrack{display:inline-flex;white-space:nowrap;will-change:transform;animation:ts-marquee 60s linear infinite;}
+.ts-tape:hover .ts-tapetrack{animation-play-state:paused;}
+@keyframes ts-marquee{from{transform:translateX(0);}to{transform:translateX(-50%);}}
+.ts-tapeitem{display:inline-flex;align-items:baseline;gap:7px;padding:0 18px;font-size:12.5px;border-right:1px solid var(--line);font-family:'IBM Plex Mono',monospace;}
+.ts-tapeitem:not(.idx){cursor:pointer;}
+.ts-tapeitem:not(.idx):hover b{color:var(--gold);}
+.ts-tapeitem b{color:var(--tx);font-weight:600;}
+.ts-tapeitem span{color:var(--mut);}
+.ts-tapeitem em{font-style:normal;font-weight:600;}
+.ts-tapeitem.idx b{color:var(--gold);}
+/* accordion do histórico (linha apostada) */
+.ts-prow--exp{cursor:pointer;}
+.ts-prow--exp:hover{background:rgba(214,164,69,.06);}
+.ts-caret{display:inline-block;color:var(--gold);font-size:10px;transition:transform .15s;margin-right:2px;}
+.ts-caret.open{transform:rotate(90deg);}
+.ts-pexp{background:var(--s1);border:1px solid var(--line);border-top:none;border-radius:0 0 8px 8px;padding:14px 16px;margin:-4px 0 8px;}
+.ts-pexpgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;margin-bottom:8px;}
+.ts-pexpgrid div{display:flex;flex-direction:column;}
+.ts-pexpgrid span{font-size:11px;color:var(--mut);margin-bottom:2px;}
+.ts-pexpgrid b{font-family:'IBM Plex Mono',monospace;font-size:14px;}
+.ts-pexpline{font-size:12.5px;color:var(--tx);padding:5px 0 0;border-top:1px solid var(--line);margin-top:6px;}
+.ts-pexpline span{color:var(--mut);}
+.ts-pexpline a{color:var(--gold);text-decoration:none;}
+.ts-pexpline a:hover{text-decoration:underline;}
+/* escolha do trader (destaque) */
+.ts-tpsec{padding-top:8px;padding-bottom:8px;border-top:none;}
+.ts-tpcard{background:linear-gradient(180deg,rgba(214,164,69,.07),var(--s1));border:1.5px solid var(--gold);border-radius:16px;padding:18px 20px;cursor:pointer;transition:transform .12s,box-shadow .12s;}
+.ts-tpcard:hover{transform:translateY(-2px);box-shadow:0 10px 30px rgba(0,0,0,.35);}
+.ts-tphead{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;}
+.ts-tplabel{font-family:'Space Grotesk',sans-serif;font-weight:700;color:var(--gold);letter-spacing:.03em;font-size:14px;}
+.ts-tpbody{display:flex;gap:22px;align-items:center;flex-wrap:wrap;}
+.ts-tpleft{flex:1;min-width:240px;}
+.ts-tptop{display:flex;gap:12px;align-items:center;margin-bottom:8px;}
+.ts-tptop .ts-mono{width:44px;height:44px;font-size:15px;border-radius:11px;}
+.ts-tptic{font-family:'Space Grotesk',sans-serif;font-size:22px;font-weight:700;}
+.ts-tpname{font-size:13px;color:var(--mut);}
+.ts-tpnota{font-style:italic;color:var(--tx);font-size:14px;margin:8px 0 12px;border-left:2px solid var(--gold);padding-left:10px;}
+.ts-tpmetrics{display:flex;gap:22px;flex-wrap:wrap;}
+.ts-tpmetrics div{display:flex;flex-direction:column;}
+.ts-tpmetrics span{font-size:11px;color:var(--mut);}
+.ts-tpmetrics b{font-family:'IBM Plex Mono',monospace;font-size:18px;}
+.ts-tpchart{width:300px;max-width:100%;}
+.ts-tpfoot{margin-top:14px;padding-top:12px;border-top:1px solid var(--line);color:var(--gold);font-size:13px;font-weight:600;}
+.ts-tpnote{color:var(--mut);font-weight:400;font-size:11.5px;}
+@media(max-width:620px){.ts-tpchart{width:100%;}}
 `;

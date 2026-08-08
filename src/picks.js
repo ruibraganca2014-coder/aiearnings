@@ -95,6 +95,22 @@ export async function saveSettings(token, settings) {
   return r.json();
 }
 
+// ---- ledger (extrato DEGIRO: trades, equity, stats) ----
+export async function fetchLedger() {
+  try { const r = await fetch("/api/ledger", { cache: "no-store" }); return r.ok ? await r.json() : {}; } catch { return {}; }
+}
+export async function uploadLedger(token, file, base) {
+  const r = await fetch("/api/ledger", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + token }, body: JSON.stringify({ file, base }) });
+  if (r.status === 401) throw new Error("401");
+  if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || "http " + r.status);
+  return r.json();
+}
+// ---- ticker tape (índices + ações, cotação + variação) ----
+export async function fetchTape(symbols) {
+  if (!symbols || !symbols.length) return [];
+  try { const r = await fetch("/api/yahoo/tape?symbols=" + encodeURIComponent(symbols.join(",")), { cache: "no-store" }); return r.ok ? await r.json() : []; } catch { return []; }
+}
+
 export async function login(password) {
   const r = await fetch("/api/auth/login", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ password }) });
   return r.json();

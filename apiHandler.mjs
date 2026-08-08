@@ -1,8 +1,9 @@
 // Handler único da API — usado pelo Vite (dev) e pelo server.mjs (produção).
-import { realQuote, realCalendar, realResearch, realPrices, extractDoc } from "./yahooReal.mjs";
-import { readPicks, writePicks, publishedPicks, readPositions, writePositions, readEmails, addEmail, readHistory, writeHistory, readTrades, writeTrades, readSettings, writeSettings, login, validToken } from "./store.mjs";
+import { realQuote, realCalendar, realResearch, realPrices, realTape, extractDoc } from "./yahooReal.mjs";
+import { parseDegiro } from "./ledger.mjs";
+import { readPicks, writePicks, publishedPicks, readPositions, writePositions, readEmails, addEmail, readHistory, writeHistory, readTrades, writeTrades, readSettings, writeSettings, readLedger, writeLedger, login, validToken } from "./store.mjs";
 
-const API_PREFIXES = ["/api/picks", "/api/auth", "/api/positions", "/api/emails", "/api/history", "/api/extract", "/api/trades", "/api/settings", "/api/yahoo/"];
+const API_PREFIXES = ["/api/picks", "/api/auth", "/api/positions", "/api/emails", "/api/history", "/api/extract", "/api/trades", "/api/settings", "/api/ledger", "/api/yahoo/"];
 export const isApi = (url) => API_PREFIXES.some((p) => url.startsWith(p));
 
 const bodyJSON = (req) => new Promise((resolve) => {
@@ -80,6 +81,19 @@ export async function handleApi(req, res) {
       if (!settings || typeof settings !== "object") return send({ error: "settings inválido" }, 400), true;
       writeSettings(settings); return send({ ok: true }), true;
     }
+    // ---- ledger (extrato DEGIRO parseado) ----
+    if (u.pathname === "/api/ledger" && req.method === "GET") return send(readLedger() || {}), true;
+    if (u.pathname === "/api/ledger" && req.method === "POST") {
+      if (!auth()) return send({ error: "não autenticado" }, 401), true;
+      const { file, base } = await bodyJSON(req);
+      const b64 = String(file || "").replace(/^data:[^,]+,/, "");
+      if (!b64) return send({ error: "ficheiro vazio" }, 400), true;
+      try {
+        const parsed = await parseDegiro(Buffer.from(b64, "base64"), base != null ? Number(base) : 2500);
+        writeLedger(parsed);
+        return send(parsed), true;
+      } catch (e) { return send({ error: "parse falhou: " + String(e.message || e) }, 400), true; }
+    }
     // ---- extract (IA) ----
     if (u.pathname === "/api/extract" && req.method === "POST") {
       if (!auth()) return send({ error: "não autenticado" }, 401), true;
@@ -88,6 +102,7 @@ export async function handleApi(req, res) {
     }
     // ---- yahoo ----
     if (u.pathname === "/api/yahoo/price") return send(await realPrices(u.searchParams.get("symbols"))), true;
+    if (u.pathname === "/api/yahoo/tape") return send(await realTape(u.searchParams.get("symbols"))), true;
     if (u.pathname === "/api/yahoo/quote") return send(await realQuote(u.searchParams.get("symbol"), { llm: u.searchParams.get("llm") === "1" })), true;
     if (u.pathname === "/api/yahoo/calendar") return send(await realCalendar(u.searchParams.get("from"), u.searchParams.get("to"))), true;
     if (u.pathname === "/api/yahoo/research") return send(await realResearch(u.searchParams.get("symbol"), u.searchParams.get("type"))), true;

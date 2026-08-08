@@ -630,6 +630,27 @@ Regras: "trade" = compra+venda reais (preenche buyPrice/sellPrice/pnl/pct se vis
   } catch (e) { return { records: [], note: "Erro: " + String(e.message || e) }; }
 }
 
+// barra de cotações (ticker tape): preço + variação % + nome curto, em lote. Cache 60s.
+async function _realTape(symbolsCsv) {
+  const syms = String(symbolsCsv || "").split(",").map((s) => s.trim()).filter(Boolean);
+  if (!syms.length) return [];
+  try {
+    const qs = await yf.quote(syms, undefined, NV);
+    const arr = Array.isArray(qs) ? qs : [qs];
+    const bySym = new Map(arr.filter((q) => q && q.symbol).map((q) => [q.symbol.toUpperCase(), q]));
+    return syms.map((s) => {
+      const q = bySym.get(s.toUpperCase());
+      if (!q) return null;
+      return {
+        symbol: s, name: q.shortName || q.longName || s,
+        price: numOf(q.regularMarketPrice), change: q.regularMarketChangePercent != null ? r2(q.regularMarketChangePercent) : null,
+        currency: q.currency || "",
+      };
+    }).filter(Boolean);
+  } catch { return []; }
+}
+export const realTape = (csv) => cached("tape:" + String(csv || ""), 60e3, () => _realTape(csv));
+
 // preços atuais em lote (leve) — para o contador de posições
 export async function realPrices(symbolsCsv) {
   const syms = String(symbolsCsv || "").split(",").map((s) => s.trim().toUpperCase()).filter(Boolean);

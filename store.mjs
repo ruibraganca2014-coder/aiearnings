@@ -12,6 +12,7 @@ const HIST_FILE = join(DATA, "history.json");
 const EMAILS_FILE = join(DATA, "emails.json");
 const TRADES_FILE = join(DATA, "trades.json");
 const SETTINGS_FILE = join(DATA, "settings.json");
+const LEDGER_FILE = join(DATA, "ledger.json");
 
 // ---- picks (curadoria) ----
 export function readPicks() {
@@ -27,7 +28,7 @@ export function writePicks(obj) {
 export function publishedPicks() {
   const all = readPicks();
   const out = {};
-  for (const [k, v] of Object.entries(all)) if (v && v.show && v.reco) out[k] = v;
+  for (const [k, v] of Object.entries(all)) if (v && v.show && (v.reco || v.featured)) out[k] = v;
   return out;
 }
 
@@ -88,6 +89,17 @@ export function writeSettings(o) {
   const d = dirname(SETTINGS_FILE);
   if (!existsSync(d)) mkdirSync(d, { recursive: true });
   writeFileSync(SETTINGS_FILE, JSON.stringify(o && typeof o === "object" ? o : {}, null, 2));
+  return o;
+}
+
+// ---- ledger (extrato DEGIRO parseado: trades, equity, stats) ----
+export function readLedger() {
+  try { return JSON.parse(readFileSync(LEDGER_FILE, "utf8")); } catch { return null; }
+}
+export function writeLedger(o) {
+  const d = dirname(LEDGER_FILE);
+  if (!existsSync(d)) mkdirSync(d, { recursive: true });
+  writeFileSync(LEDGER_FILE, JSON.stringify(o && typeof o === "object" ? o : {}, null, 2));
   return o;
 }
 

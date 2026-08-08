@@ -1,10 +1,10 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import EarningsEdge from "../EarningsEdge.jsx";
-import { getToken, setToken, clearToken, fetchAll, savePicks, login, fetchPositions, savePositions, fetchPrices, daysBetween, fetchHistory, saveHistory, extractDoc, fetchTrades, saveTrades, fetchEmails, fetchSettings, saveSettings } from "./picks.js";
+import { getToken, setToken, clearToken, fetchAll, savePicks, login, fetchPositions, savePositions, fetchPrices, daysBetween, fetchHistory, saveHistory, extractDoc, fetchTrades, saveTrades, fetchEmails, fetchSettings, saveSettings, uploadLedger } from "./picks.js";
 import { TRADES } from "./trades.js";
 import { WD, exchOf, fmtDay } from "./shared.js";
 
-const emptyRec = () => ({ type: "reaction", ticker: "", name: "", date: new Date().toISOString().slice(0, 10), pct: "", pnl: "" });
+const emptyRec = () => ({ type: "reaction", ticker: "", name: "", date: new Date().toISOString().slice(0, 10), pct: "", pnl: "", predicted: "SUBIR", probUp: "", nota: "" });
 
 const RECOS = ["", "SUBIR", "DESCER", "NEUTRO"];
 
@@ -339,7 +339,10 @@ function HistoricoAdmin({ token, onAuthFail }) {
   const [busy, setBusy] = useState(false);
   const [acct, setAcct] = useState({ saldo: "", totalPL: "", capitalBase: "2500" });
   const [acctSaved, setAcctSaved] = useState(true);
+  const [led, setLed] = useState(null); // resultado do parse do extrato DEGIRO
+  const [ledBusy, setLedBusy] = useState(false);
   const inp = useRef(null);
+  const ledInp = useRef(null);
 
   useEffect(() => {
     fetchHistory().then(setHist);
@@ -368,6 +371,29 @@ function HistoricoAdmin({ token, onAuthFail }) {
     saveSettings(token, { saldo: acct.saldo === "" ? null : Number(acct.saldo), totalPL: acct.totalPL === "" ? null : Number(acct.totalPL), capitalBase: acct.capitalBase === "" ? null : Number(acct.capitalBase) })
       .then(() => setAcctSaved(true)).catch((e) => { if (String(e.message) === "401") onAuthFail(); });
   };
+  // upload do extrato "Conta Corrente" DEGIRO (.xls/.xlsx): parse no servidor → trades, equity, stats
+  const onLedgerFile = (e) => {
+    const f = e.target.files?.[0]; if (!f) return;
+    setLedBusy(true); setNote("A processar extrato DEGIRO…");
+    const r = new FileReader();
+    r.onload = async () => {
+      try {
+        const base = acct.capitalBase === "" ? 2500 : Number(acct.capitalBase);
+        const res = await uploadLedger(token, r.result, base);
+        setLed(res);
+        setNote(`Extrato processado ✓ — ${res.stats?.n || 0} trades · acerto ${res.stats?.winRate ?? "—"}% · L/P ${res.stats?.totalPL >= 0 ? "+" : ""}${res.stats?.totalPL ?? "—"}€`);
+      } catch (e2) { if (String(e2.message) === "401") return onAuthFail(); setNote("Falha no extrato: " + e2.message); }
+      setLedBusy(false);
+      e.target.value = "";
+    };
+    r.readAsDataURL(f);
+  };
+  // importa os round-trips do extrato para o rascunho (para confirmar → publicar no histórico)
+  const importLedgerToDraft = () => {
+    if (!led?.trades?.length) return;
+    setDraft(led.trades.map((t) => ({ ...emptyRec(), type: "trade", ticker: t.ticker || "", name: t.name || "", date: t.sellDate || "", pct: t.pct ?? "", pnl: t.pl ?? "" })));
+    setNote("Trades do extrato no rascunho — revê e publica.");
+  };
   const editRow = (i, k, v) => setDraft((d) => d.map((r, j) => j === i ? { ...r, [k]: v } : r));
   const addRow = () => setDraft((d) => [...d, emptyRec()]);
   const delRow = (i) => setDraft((d) => d.filter((_, j) => j !== i));
@@ -376,6 +402,7 @@ function HistoricoAdmin({ token, onAuthFail }) {
     const clean = draft.filter((r) => r.ticker && r.date).map((r) => ({
       type: r.type, ticker: String(r.ticker).toUpperCase().trim(), name: r.name || r.ticker, date: r.date,
       pct: r.pct === "" ? null : Number(r.pct), pnl: r.pnl === "" ? null : Number(r.pnl),
+      predicted: r.type === "trade" ? (r.predicted || null) : null, probUp: r.probUp === "" || r.probUp == null ? null : Number(r.probUp), nota: r.nota || null,
       exch: exchOf(r.ticker), src: "upload",
     }));
     if (!clean.length) { setNote("Nada válido para publicar."); return; }
@@ -402,6 +429,15 @@ function HistoricoAdmin({ token, onAuthFail }) {
         <span className="ad-muted" style={{ fontSize: 12 }}>a IA preenche do upload; confirma.</span>
       </div>
 
+      <div className="ad-form" style={{ alignItems: "center", background: "rgba(214,164,69,.06)" }}>
+        <b style={{ fontSize: 13 }}>Extrato DEGIRO (.xls) —</b>
+        <button className="ad-btn sm" disabled={ledBusy} onClick={() => ledInp.current?.click()}>{ledBusy ? "…" : "＋ Carregar Conta Corrente"}</button>
+        <input ref={ledInp} type="file" accept=".xls,.xlsx,.csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" hidden onChange={onLedgerFile} />
+        {led && <span className="ad-muted" style={{ fontSize: 12 }}>{led.stats?.n} trades · acerto {led.stats?.winRate}% · L/P {led.stats?.totalPL >= 0 ? "+" : ""}{led.stats?.totalPL}€ · hold {led.stats?.avgHold}d</span>}
+        {led && <button className="ad-btn sm" onClick={importLedgerToDraft} style={{ background: "transparent", border: "1px solid var(--line)", color: "var(--gold)" }}>Importar trades → rascunho</button>}
+      </div>
+      <div className="ad-muted" style={{ fontSize: 12, marginBottom: 10 }}>O extrato alimenta a <b>curva de capital</b>, os balões (melhor/pior/hold/câmbio) e as páginas por ação — automaticamente. As linhas de <i>Cash Sweep / Depósitos / Levantamentos</i> são plumbing interno e são ignoradas.</div>
+
       <div className="ad-form" style={{ alignItems: "flex-start" }}>
         <button className="ad-btn sm" onClick={() => inp.current?.click()}>＋ Escolher imagem/PDF</button>
         <input ref={inp} type="file" accept="image/*,application/pdf" hidden onChange={onFile} />
@@ -415,7 +451,7 @@ function HistoricoAdmin({ token, onAuthFail }) {
         <>
           <div className="ad-muted" style={{ marginBottom: 6 }}>Rascunho — revê/corrige e publica:</div>
           <table className="ad-tbl">
-            <thead><tr><th>Tipo</th><th>Ticker</th><th>Nome</th><th>Data</th><th>%</th><th>€ (trade)</th><th></th></tr></thead>
+            <thead><tr><th>Tipo</th><th>Ticker</th><th>Nome</th><th>Data</th><th>%</th><th>€ (trade)</th><th>Previsão</th><th>Prob ↑%</th><th>Motivo</th><th></th></tr></thead>
             <tbody>
               {draft.map((r, i) => (
                 <tr key={i}>
@@ -425,6 +461,9 @@ function HistoricoAdmin({ token, onAuthFail }) {
                   <td><input className="ad-note" style={{ width: 130 }} type="date" value={r.date} onChange={(e) => editRow(i, "date", e.target.value)} /></td>
                   <td><input className="ad-note" style={{ width: 70 }} type="number" step="0.1" value={r.pct} onChange={(e) => editRow(i, "pct", e.target.value)} /></td>
                   <td><input className="ad-note" style={{ width: 80 }} type="number" value={r.pnl} onChange={(e) => editRow(i, "pnl", e.target.value)} /></td>
+                  <td><select className="ad-sel" value={r.predicted || ""} disabled={r.type !== "trade"} onChange={(e) => editRow(i, "predicted", e.target.value)}><option value="">—</option><option value="SUBIR">Subir ↑</option><option value="DESCER">Descer ↓</option><option value="NEUTRO">Neutro</option></select></td>
+                  <td><input className="ad-note" style={{ width: 60 }} type="number" min="0" max="100" placeholder="61" value={r.probUp ?? ""} onChange={(e) => editRow(i, "probUp", e.target.value)} /></td>
+                  <td><input className="ad-note" style={{ width: 160 }} placeholder="ex: beat histórico + momentum" value={r.nota ?? ""} onChange={(e) => editRow(i, "nota", e.target.value)} /></td>
                   <td><button className="ad-logout" onClick={() => delRow(i)}>×</button></td>
                 </tr>
               ))}
@@ -454,6 +493,47 @@ function HistoricoAdmin({ token, onAuthFail }) {
             })}
           </tbody>
         </table>
+      )}
+    </div>
+  );
+}
+
+// Escolha do trader: marca UMA pick publicada como destaque (★) + nota do porquê.
+function DestaqueAdmin({ token, onAuthFail }) {
+  const [picks, setPicks] = useState(null);
+  const [saved, setSaved] = useState(true);
+  useEffect(() => { fetchAll(token).then(setPicks).catch((e) => { if (String(e.message) === "401") onAuthFail(); }); }, []);
+  if (!picks) return <div className="ad-muted">A carregar picks…</div>;
+  const entries = Object.entries(picks).filter(([, v]) => v.show)
+    .sort((a, b) => (a[1].entryISO || a[1].date || "").localeCompare(b[1].entryISO || b[1].date || ""));
+  const persist = (next) => { setPicks(next); setSaved(false); savePicks(token, next).then(() => setSaved(true)).catch((e) => { if (String(e.message) === "401") onAuthFail(); }); };
+  const setFeatured = (key) => { const next = {}; for (const [k, v] of Object.entries(picks)) next[k] = { ...v, featured: k === key ? !v.featured : false }; persist(next); };
+  const setNota = (key, val) => setPicks((p) => ({ ...p, [key]: { ...p[key], nota: val } }));
+  const saveNotas = () => persist(picks);
+  const featuredKey = entries.find(([, v]) => v.featured)?.[0];
+  return (
+    <div>
+      <div className="ad-bar">Escolha do trader · marca <b>UMA</b> ação publicada com <b>★</b> — aparece em destaque no topo do site. {featuredKey ? <>Atual: <b>{picks[featuredKey].ticker}</b></> : <span style={{ color: "#D6A445" }}>nenhuma escolhida</span>} · <span style={{ color: saved ? "#2FA37A" : "#D6A445" }}>{saved ? "guardado ✓" : "a guardar…"}</span></div>
+      {!entries.length ? <div className="ad-muted">Sem picks publicadas. Publica no Painel de análise primeiro.</div> : (
+        <>
+          <div className="ad-muted" style={{ marginBottom: 8 }}>Escreve o motivo (nota) e clica <b>Guardar notas</b>. O ★ grava logo.</div>
+          <table className="ad-tbl">
+            <thead><tr><th>★</th><th>Ticker</th><th>Nome</th><th>Prob ↑</th><th>Entrada</th><th>Motivo / nota do trader</th></tr></thead>
+            <tbody>
+              {entries.map(([k, v]) => (
+                <tr key={k} style={v.featured ? { background: "rgba(214,164,69,.10)" } : undefined}>
+                  <td><button className="ad-btn sm" style={{ padding: "2px 8px", background: v.featured ? "var(--gold)" : "transparent", color: v.featured ? "#1a1206" : "var(--gold)", border: "1px solid var(--gold)" }} onClick={() => setFeatured(k)}>★</button></td>
+                  <td className="ad-tk">{v.ticker}</td>
+                  <td className="ad-nm">{v.name}</td>
+                  <td style={{ fontFamily: "'IBM Plex Mono',monospace", color: v.probUp >= 55 ? "#2FA37A" : v.probUp <= 45 ? "#C8553D" : "#D6A445" }}>{v.probUp != null ? v.probUp + "%" : "—"}</td>
+                  <td className="ad-muted">{v.entryISO || v.date || "—"}</td>
+                  <td><input className="ad-note" style={{ width: 260 }} placeholder="ex: beat histórico + momentum forte" value={v.nota || ""} onChange={(e) => setNota(k, e.target.value)} /></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <button className="ad-btn" style={{ marginTop: 12 }} onClick={saveNotas}>Guardar notas</button>
+        </>
       )}
     </div>
   );
@@ -521,6 +601,7 @@ export default function Admin() {
           <button className={tab === "pos" ? "on" : ""} onClick={() => setTab("pos")}>Posições (espera)</button>
           <button className={tab === "trades" ? "on" : ""} onClick={() => setTab("trades")}>Trades</button>
           <button className={tab === "hist" ? "on" : ""} onClick={() => setTab("hist")}>Histórico (upload)</button>
+          <button className={tab === "destaque" ? "on" : ""} onClick={() => setTab("destaque")}>★ Destaque</button>
           <button className={tab === "subs" ? "on" : ""} onClick={() => setTab("subs")}>Subscritores</button>
           <button className={tab === "ana" ? "on" : ""} onClick={() => setTab("ana")}>Painel de análise</button>
         </div>
@@ -535,6 +616,8 @@ export default function Admin() {
         <div className="ad-wrap"><TradesAdmin token={token} onAuthFail={logout} /></div>
       ) : tab === "hist" ? (
         <div className="ad-wrap"><HistoricoAdmin token={token} onAuthFail={logout} /></div>
+      ) : tab === "destaque" ? (
+        <div className="ad-wrap"><DestaqueAdmin token={token} onAuthFail={logout} /></div>
       ) : tab === "subs" ? (
         <div className="ad-wrap"><SubscritoresAdmin token={token} onAuthFail={logout} /></div>
       ) : (
