@@ -388,7 +388,6 @@ function Predictions({ picks, suspenso, onDetail }) {
                   if (parts.length <= 1) {
                     if (p2.momentum != null) parts.push("mom " + (p2.momentum >= 0 ? "+" : "") + p2.momentum + "%");
                     if (p2.rsi != null) parts.push("RSI " + p2.rsi);
-                    if (p2.analyst) parts.push(p2.analyst === "bullish" ? "analistas otimistas" : p2.analyst === "bearish" ? "analistas pessimistas" : "analistas neutros");
                     if (parts.length <= 1) parts.push("análise de reação limitada");
                   }
                   return parts.length ? <span className="ts-pmetrics">{parts.join(" · ")}</span> : null;
