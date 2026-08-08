@@ -275,17 +275,27 @@ function RendaAdmin({ token, onAuthFail }) {
   const [saved, setSaved] = useState(true);
   const [totalPL, setTotalPL] = useState("");
   const [saldo, setSaldo] = useState("");
+  const [diaPL, setDiaPL] = useState("");
+  const [carteira, setCarteira] = useState("");
+  const [pl3d, setPl3d] = useState("");
+  const [pl7d, setPl7d] = useState("");
+  const [pl1m, setPl1m] = useState("");
   const [plSaved, setPlSaved] = useState(true);
 
   useEffect(() => {
     fetchLedger().then(setLed);
-    fetchSettings().then((s) => { setTotalPL(s.totalPL != null ? String(s.totalPL) : ""); setSaldo(s.saldo != null ? String(s.saldo) : ""); });
+    fetchSettings().then((s) => {
+      setTotalPL(s.totalPL != null ? String(s.totalPL) : ""); setSaldo(s.saldo != null ? String(s.saldo) : "");
+      setDiaPL(s.diaPL != null ? String(s.diaPL) : ""); setCarteira(s.carteira != null ? String(s.carteira) : "");
+      setPl3d(s.pl3d != null ? String(s.pl3d) : ""); setPl7d(s.pl7d != null ? String(s.pl7d) : ""); setPl1m(s.pl1m != null ? String(s.pl1m) : "");
+    });
     fetchEmails(token).then(setEmails).catch((e) => { if (String(e.message) === "401") onAuthFail(); });
   }, [token]);
 
+  const num = (v) => (v === "" ? null : Number(v));
   const savePL = () => {
     setPlSaved(false);
-    saveSettings(token, { totalPL: totalPL === "" ? null : Number(totalPL), saldo: saldo === "" ? null : Number(saldo) }).then(() => setPlSaved(true)).catch((e) => { if (String(e.message) === "401") onAuthFail(); });
+    saveSettings(token, { totalPL: num(totalPL), saldo: num(saldo), diaPL: num(diaPL), carteira: num(carteira), pl3d: num(pl3d), pl7d: num(pl7d), pl1m: num(pl1m) }).then(() => setPlSaved(true)).catch((e) => { if (String(e.message) === "401") onAuthFail(); });
   };
 
   const persist = (next) => {
@@ -312,6 +322,16 @@ function RendaAdmin({ token, onAuthFail }) {
         <input className="ad-note" style={{ maxWidth: 120 }} type="number" step="0.01" placeholder="ex. 1153.15" value={totalPL} onChange={(e) => setTotalPL(e.target.value)} />
         <b style={{ fontSize: 13 }}>Saldo €:</b>
         <input className="ad-note" style={{ maxWidth: 120 }} type="number" step="0.01" placeholder="ex. 2776.88" value={saldo} onChange={(e) => setSaldo(e.target.value)} />
+        <b style={{ fontSize: 13 }}>Dia L/P €:</b>
+        <input className="ad-note" style={{ maxWidth: 110 }} type="number" step="0.01" placeholder="ex. 0" value={diaPL} onChange={(e) => setDiaPL(e.target.value)} />
+        <b style={{ fontSize: 13 }}>Posições abertas €:</b>
+        <input className="ad-note" style={{ maxWidth: 110 }} type="number" step="0.01" placeholder="ex. 0.98" value={carteira} onChange={(e) => setCarteira(e.target.value)} />
+        <b style={{ fontSize: 13 }}>L/P 3 dias €:</b>
+        <input className="ad-note" style={{ maxWidth: 100 }} type="number" step="0.01" placeholder="ex. 120" value={pl3d} onChange={(e) => setPl3d(e.target.value)} />
+        <b style={{ fontSize: 13 }}>L/P 7 dias €:</b>
+        <input className="ad-note" style={{ maxWidth: 100 }} type="number" step="0.01" placeholder="ex. 250" value={pl7d} onChange={(e) => setPl7d(e.target.value)} />
+        <b style={{ fontSize: 13 }}>L/P 1 mês €:</b>
+        <input className="ad-note" style={{ maxWidth: 100 }} type="number" step="0.01" placeholder="ex. 800" value={pl1m} onChange={(e) => setPl1m(e.target.value)} />
         <button className="ad-btn sm" onClick={savePL}>Guardar</button>
         <span style={{ color: plSaved ? "#2FA37A" : "#D6A445", fontSize: 12 }}>{plSaved ? "✓" : "…"}</span>
         <span className="ad-muted" style={{ fontSize: 12 }}>aparece no site como "resultado total". Copia do teu DEGIRO.</span>

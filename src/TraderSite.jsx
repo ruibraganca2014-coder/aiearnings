@@ -39,7 +39,7 @@ function CookieBanner() {
   );
 }
 
-function Featured({ picks }) {
+function Featured({ picks, suspenso }) {
   const list = Object.values(picks || {}).filter((p) => p.show && p.reco && exchOf(p.ticker) === "EUA")
     .sort((a, b) => (a.entryISO || a.date || "").localeCompare(b.entryISO || b.date || ""))
     .slice(0, 8); // as próximas 8 (EUA, por data)
@@ -48,7 +48,7 @@ function Featured({ picks }) {
     <div className="ts-featwrap">
       {list.map((p) => (
         <div className="ts-feat" key={p.ticker} style={{ borderTopColor: recoColor(p.reco) }}>
-          <div className="ts-feathd"><span className="ts-fttic">{p.ticker} <span className="ts-aitag" title="Análise assistida por IA">IA</span></span><span className="ts-ftbadge" style={{ background: recoColor(p.reco) }}>{p.reco}</span></div>
+          <div className="ts-feathd"><span className="ts-fttic">{p.ticker} <span className="ts-aitag" title="Análise assistida por IA">IA</span></span><span className="ts-ftbadge" style={{ background: suspenso ? "#8CA3B3" : recoColor(p.reco) }}>{suspenso ? "SUSPENSO" : p.reco}</span></div>
           <div className="ts-ftname">{p.name}</div>
           {p.nota && <div className="ts-ftnote">“{p.nota}”</div>}
           <div className="ts-ftmeta">{p.exch || "EUA"}{p.entryISO ? " · entrar " + fmtDay(p.entryISO) : ""}{p.gapUp != null ? " · gap↑ " + p.gapUp + "%" : ""}</div>
@@ -58,7 +58,7 @@ function Featured({ picks }) {
   );
 }
 
-function Predictions({ picks }) {
+function Predictions({ picks, suspenso }) {
   const [rows, setRows] = useState(null);
   const [err, setErr] = useState("");
   useEffect(() => {
@@ -94,9 +94,11 @@ function Predictions({ picks }) {
                 <span className="ts-pex">{exchOf(it.ticker)}</span>
                 <span className="ts-pname">{it.name}</span>
                 <span className="ts-pwhen">{it.when === "BMO" ? "pré-abertura" : it.when === "AMC" ? "após fecho" : ""}</span>
-                {picks[it.ticker]?.show && picks[it.ticker]?.reco
-                  ? <span className="ts-pbadge" style={{ background: recoColor(picks[it.ticker].reco) }}>{picks[it.ticker].reco}</span>
-                  : <span className="ts-plock" title="Probabilidade (subir/descer) na área premium">🔒 premium</span>}
+                {suspenso
+                  ? <span className="ts-pbadge" style={{ background: "#8CA3B3" }}>SUSPENSO</span>
+                  : picks[it.ticker]?.show && picks[it.ticker]?.reco
+                    ? <span className="ts-pbadge" style={{ background: recoColor(picks[it.ticker].reco) }}>{picks[it.ticker].reco}</span>
+                    : <span className="ts-plock" title="Probabilidade (subir/descer) na área premium">🔒 premium</span>}
               </div>
             ))}
           </div>
@@ -328,8 +330,13 @@ export default function TraderSite() {
   const [picks, setPicks] = useState({});
   const [hist, setHist] = useState([]);
   const [settings, setSettings] = useState({});
+  const [openPos, setOpenPos] = useState([]);
+  const [posPrices, setPosPrices] = useState({});
   useEffect(() => {
-    const load = () => { fetchPublished().then(setPicks); fetchHistory().then((h) => setHist(Array.isArray(h) ? h : [])); fetchSettings().then(setSettings); };
+    const load = () => {
+      fetchPublished().then(setPicks); fetchHistory().then((h) => setHist(Array.isArray(h) ? h : [])); fetchSettings().then(setSettings);
+      fetchPositions().then((p) => { const a = Array.isArray(p) ? p : []; setOpenPos(a); fetchPrices(a.map((x) => x.ticker)).then(setPosPrices); });
+    };
     load();
     const onVis = () => { if (!document.hidden) load(); };
     window.addEventListener("focus", load);
@@ -349,6 +356,13 @@ export default function TraderSite() {
   }, [hist]);
   const totalPL = Number(settings.totalPL) || 0; // Total L/P real do DEGIRO (€, definido no admin)
   const saldo = Number(settings.saldo) || 0; // Saldo da conta DEGIRO (€)
+  const diaPL = settings.diaPL != null ? Number(settings.diaPL) : null; // Dia L/P (€)
+  const carteira = settings.carteira != null ? Number(settings.carteira) : null; // posições abertas (€)
+  const plPer = [["pl3d", "3 dias"], ["pl7d", "7 dias"], ["pl1m", "1 mês"]].map(([k, l]) => ({ l, v: settings[k] != null ? Number(settings[k]) : null })).filter((x) => x.v != null); // L/P por período
+  // suspenso: há posição aberta submersa (abaixo do preço) → capital preso → previsões suspensas
+  const submersas = useMemo(() => openPos.filter((p) => { const c = posPrices[p.ticker]; return c != null && c < p.buyPrice; }), [openPos, posPrices]);
+  const suspenso = submersas.length > 0;
+  const heldTickers = submersas.map((p) => p.ticker).join(", ");
   return (
     <div className="ts-root">
       <style>{CSS}</style>
@@ -398,6 +412,9 @@ export default function TraderSite() {
           <div className="ts-stat"><b>{stats.subiu}%</b><span>que subiram</span><small>subiram nos resultados</small></div>
           <div className="ts-stat"><b style={{ color: totalPL >= 0 ? "#2FA37A" : "#C8553D" }}>{totalPL >= 0 ? "+" : ""}{eur(totalPL)}</b><span>resultado total (DEGIRO)</span><small>média {stats.avgPct >= 0 ? "+" : ""}{stats.avgPct.toFixed(1)}%/trade</small></div>
           {saldo !== 0 && <div className="ts-stat"><b>{eur(saldo)}</b><span>saldo da conta</span><small>capital atual (DEGIRO)</small></div>}
+          {diaPL != null && <div className="ts-stat"><b style={{ color: diaPL > 0 ? "#2FA37A" : diaPL < 0 ? "#C8553D" : "var(--tx)" }}>{diaPL >= 0 ? "+" : ""}{eur(diaPL)}</b><span>dia L/P</span><small>ganho/perda do dia</small></div>}
+          {carteira != null && <div className="ts-stat"><b>{eur(carteira)}</b><span>posições abertas</span><small>valor em carteira</small></div>}
+          {plPer.map((p) => <div className="ts-stat" key={p.l}><b style={{ color: p.v > 0 ? "#2FA37A" : p.v < 0 ? "#C8553D" : "var(--tx)" }}>{p.v >= 0 ? "+" : ""}{eur(p.v)}</b><span>L/P {p.l}</span><small>ganho/perda no período</small></div>)}
         </div>
         <div className="ts-note">Resultados passados não garantem futuros. Não é aconselhamento financeiro; é análise probabilística assistida por IA.</div>
       </section>
@@ -407,8 +424,9 @@ export default function TraderSite() {
       <section id="site-prev" className="ts-sec">
         <h2>Previsões desta semana</h2>
         <p className="ts-lead">Quem reporta e quando (hora de Portugal). As destacadas mostram a <b>probabilidade de subir ou descer</b> nos resultados, por análise de IA. Não é recomendação de compra/venda.</p>
-        <Featured picks={picks} />
-        <Predictions picks={picks} />
+        {suspenso && <div className="ts-suspban">⏸ Previsões <b>suspensas</b> — capital em <b>{heldTickers}</b> (a recuperar). Não é possível entrar em novas até fechar a posição.</div>}
+        <Featured picks={picks} suspenso={suspenso} />
+        <Predictions picks={picks} suspenso={suspenso} />
       </section>
 
       <Positions />
@@ -507,6 +525,7 @@ const CSS = `
 .ts-stat b{font-family:'IBM Plex Mono',monospace;font-size:30px;display:block;}
 .ts-stat span{display:block;font-size:12.5px;color:var(--tx);margin-top:4px;}
 .ts-stat small{display:block;font-size:11px;color:var(--mut);margin-top:3px;}
+.ts-suspban{background:rgba(140,163,179,.14);border:1px solid var(--mut);border-radius:10px;padding:11px 14px;font-size:13.5px;color:var(--tx);margin-bottom:18px;}
 .ts-featwrap{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px;margin-bottom:22px;}
 .ts-feat{background:var(--s1);border:1px solid var(--line);border-top:3px solid;border-radius:12px;padding:14px;}
 .ts-feathd{display:flex;justify-content:space-between;align-items:center;}
