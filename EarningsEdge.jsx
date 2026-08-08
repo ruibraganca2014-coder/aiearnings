@@ -359,12 +359,23 @@ export default function EarningsEdge() {
   const [openDot, setOpenDot] = useState(null);
   const [batchRunning, setBatchRunning] = useState(false);
   const [selected, setSelected] = useState(() => new Set());
-  const toggleSelect = (ticker) =>
-    setSelected((prev) => {
-      const n = new Set(prev);
-      n.has(ticker) ? n.delete(ticker) : n.add(ticker);
-      return n;
-    });
+  // publica/despublica a ação no site (previsões) — só quando dentro do admin (token presente)
+  const publishToSite = async (it, on) => {
+    const token = localStorage.getItem("ee_admin_token");
+    if (!token) return;
+    try {
+      const all = await (await fetch("/api/picks/all", { cache: "no-store", headers: { Authorization: "Bearer " + token } })).json();
+      const cur = all[it.ticker] || {};
+      all[it.ticker] = { ...cur, ticker: it.ticker, name: it.name || cur.name || it.ticker, exch: exchLabel(it.ticker), date: it.date, entryISO: it.entryISO || it.date, when: it.when, show: on };
+      await fetch("/api/picks", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + token }, body: JSON.stringify({ picks: all }) });
+    } catch {}
+  };
+  const toggleSelect = (it) => {
+    const ticker = typeof it === "string" ? it : it.ticker;
+    const on = !selected.has(ticker);
+    setSelected((prev) => { const n = new Set(prev); on ? n.add(ticker) : n.delete(ticker); return n; });
+    if (typeof it === "object") publishToSite(it, on); // selecionar = mostrar no site; desselecionar = tirar
+  };
 
   const [calendar, setCalendar] = useState([]);
   const [calLoading, setCalLoading] = useState(false);
@@ -612,7 +623,7 @@ export default function EarningsEdge() {
                   <div
                     key={rowId}
                     className={"ee-cal-row" + (isSel ? " ee-cal-row--sel" : "") + (batchRunning ? " ee-cal-row--off" : "")}
-                    onClick={() => { if (!batchRunning) toggleSelect(it.ticker); }}
+                    onClick={() => { if (!batchRunning) toggleSelect(it); }}
                     role="button"
                     tabIndex={0}
                   >
@@ -654,10 +665,15 @@ export default function EarningsEdge() {
               </div>
             ))}
             {pastRows.length > 0 && (
-              <details className="ee-cal-past-wrap">
-                <summary className="ee-cal-mlabel ee-cal-past-sum">▸ Resultados recentes · últimos 7 dias ({pastRows.length}) — já apresentados</summary>
-                {pastRows.map((it, i) => <CalPastRow key={it.ticker + it.date + i} it={it} />)}
-              </details>
+              <div className="ee-cal-pastwrap">
+                <div className="ee-cal-mlabel ee-cal-past-sum">Resultados recentes · últimos 7 dias ({pastRows.length}) — já apresentados</div>
+                {groupByMonth(pastRows).map((grp) => (
+                  <div className="ee-cal-month" key={"past-" + grp.label}>
+                    <div className="ee-cal-mlabel">{grp.label.replace(/ · por entrada$/i, "")}</div>
+                    {grp.items.map((it, i) => <CalPastRow key={it.ticker + it.date + i} it={it} />)}
+                  </div>
+                ))}
+              </div>
             )}
           </div>
         )}
@@ -678,25 +694,31 @@ export default function EarningsEdge() {
           <div className="ee-dt-scroll">
             <table className="ee-dt">
               <thead>
-                <tr><th>Ticker</th><th>Bolsa</th><th>Data</th><th>Decisão</th><th>EV/trade</th><th>Gap ON</th><th>P(beat)</th><th>Conf.</th></tr>
+                <tr><th>Ticker</th><th>Bolsa</th><th>Decisão</th><th>EV/trade</th><th>Gap ON</th><th>P(beat)</th><th>Conf.</th></tr>
               </thead>
               <tbody>
-                {tableRows.map((r) => (
-                  <tr key={r.ticker}>
-                    <td className="ee-dt-tic">{r.ticker}</td>
-                    <td style={{ color: "var(--muted)", fontSize: "11px" }}>{exchLabel(r.ticker)}</td>
-                    <td>{fmtDay(r.date)}</td>
-                    <td style={{ color: r.err ? "#8FA6B5" : r.buy ? "#2FA37A" : "#C8553D", fontWeight: 600 }}>
-                      {r.err ? "erro" : r.buy ? "✓ COMPRAR" : "✕ NÃO"}
-                    </td>
-                    <td className="ee-dt-num">{r.ev == null ? "—" : `${r.ev >= 0 ? "+" : ""}${r.ev.toFixed(2)}%`}</td>
-                    <td className="ee-dt-num" style={{ color: r.gapAvg == null ? "#8FA6B5" : r.gapAvg >= 0 ? "#2FA37A" : "#C8553D" }} title="Gap overnight: fecho pré-anúncio → abertura pós-anúncio (média · % positivos)">
-                      {r.gapAvg == null ? "—" : `${r.gapAvg >= 0 ? "+" : ""}${r.gapAvg}% (${r.gapPctUp}%)`}
-                    </td>
-                    <td className="ee-dt-num">{r.probBeat == null ? "—" : `${r.probBeat}%`}</td>
-                    <td className="ee-dt-num">{r.conf ? `${Math.round(r.conf)}%` : "—"}</td>
-                  </tr>
-                ))}
+                {(() => {
+                  let lastDay = null; const out = [];
+                  [...tableRows].sort((a, b) => (a.date || "").localeCompare(b.date || "")).forEach((r) => {
+                    if (r.date !== lastDay) { lastDay = r.date; out.push(<tr key={"day-" + r.date} className="ee-dt-dayhdr"><td colSpan={7}>{fmtDay(r.date)}</td></tr>); }
+                    out.push(
+                      <tr key={r.ticker}>
+                        <td className="ee-dt-tic">{r.ticker}</td>
+                        <td style={{ color: "var(--muted)", fontSize: "11px" }}>{exchLabel(r.ticker)}</td>
+                        <td style={{ color: r.err ? "#8FA6B5" : r.buy ? "#2FA37A" : "#C8553D", fontWeight: 600 }}>
+                          {r.err ? "erro" : r.buy ? "✓ COMPRAR" : "✕ NÃO"}
+                        </td>
+                        <td className="ee-dt-num">{r.ev == null ? "—" : `${r.ev >= 0 ? "+" : ""}${r.ev.toFixed(2)}%`}</td>
+                        <td className="ee-dt-num" style={{ color: r.gapAvg == null ? "#8FA6B5" : r.gapAvg >= 0 ? "#2FA37A" : "#C8553D" }} title="Gap overnight: fecho pré-anúncio → abertura pós-anúncio (média · % positivos)">
+                          {r.gapAvg == null ? "—" : `${r.gapAvg >= 0 ? "+" : ""}${r.gapAvg}% (${r.gapPctUp}%)`}
+                        </td>
+                        <td className="ee-dt-num">{r.probBeat == null ? "—" : `${r.probBeat}%`}</td>
+                        <td className="ee-dt-num">{r.conf ? `${Math.round(r.conf)}%` : "—"}</td>
+                      </tr>
+                    );
+                  });
+                  return out;
+                })()}
               </tbody>
             </table>
           </div>
@@ -1589,6 +1611,8 @@ const CSS = `
 .ee-dt-tic{font-family:'Space Grotesk',sans-serif;font-weight:700;}
 .ee-dt-num{font-family:'IBM Plex Mono',monospace;text-align:right;font-variant-numeric:tabular-nums;}
 .ee-dt tbody tr:hover{background:var(--surface2);}
+.ee-dt-dayhdr td{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:12px;color:var(--gold,#D6A445);background:var(--surface2);padding:6px 8px;}
+.ee-dt-dayhdr:hover td{background:var(--surface2);}
 .ee-rank-strip{display:flex;align-items:center;gap:8px;overflow-x:auto;padding:4px 0 12px;margin-bottom:6px;}
 .ee-rank-label{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.18em;color:var(--muted);flex-shrink:0;}
 .ee-rank-pill{display:flex;align-items:center;gap:7px;background:var(--surface);border:1px solid var(--line);border-left-width:3px;border-radius:8px;padding:7px 11px;flex-shrink:0;}

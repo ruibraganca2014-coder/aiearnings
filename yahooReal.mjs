@@ -597,10 +597,10 @@ export async function extractDoc(dataUrl, mime) {
   const source = isPdf
     ? { type: "document", source: { type: "base64", media_type: "application/pdf", data: b64 } }
     : { type: "image", source: { type: "base64", media_type: (mime || "image/png"), data: b64 } };
-  const instr = `Extrai deste documento (extrato de corretora ou resultados de ações) as linhas de trades e/ou reações de ações.
+  const instr = `Extrai deste documento (extrato/visão geral de corretora ou resultados de ações): (1) linhas de trades/reações; (2) se for a visão geral da conta, o SALDO DA CONTA e o TOTAL L/P.
 Responde SÓ com JSON (sem markdown):
-{"records":[{"type":"trade"|"reaction","ticker":"XXX","name":"","date":"YYYY-MM-DD","buyPrice":<num|null>,"sellPrice":<num|null>,"pnl":<num €|null>,"pct":<num %|null>}]}
-Regras: "trade" = compra+venda reais (preenche buyPrice/sellPrice/pnl/pct se visíveis). "reaction" = só reação % da ação (preenche pct). Não inventes; deixa null o que não vês. Datas ISO.`;
+{"records":[{"type":"trade"|"reaction","ticker":"XXX","name":"","date":"YYYY-MM-DD","buyPrice":<num|null>,"sellPrice":<num|null>,"pnl":<num €|null>,"pct":<num %|null>}],"account":{"saldo":<num €|null>,"totalPL":<num €|null>}}
+Regras: "trade" = compra+venda reais (preenche buyPrice/sellPrice/pnl/pct se visíveis). "reaction" = só reação % (preenche pct). "account.saldo" = "Saldo da conta"; "account.totalPL" = "Total L/P" (mantém sinal). Usa ponto decimal (2776.88). Não inventes; null o que não vês. Datas ISO.`;
   try {
     const res = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
@@ -623,7 +623,10 @@ Regras: "trade" = compra+venda reais (preenche buyPrice/sellPrice/pnl/pct se vis
       pnl: r.pnl != null ? Number(r.pnl) : null,
       pct: r.pct != null ? Number(r.pct) : null,
     })).filter((r) => r.ticker);
-    return { records, note: records.length ? "" : "Nada detetado. Preenche à mão." };
+    const account = o.account && typeof o.account === "object"
+      ? { saldo: o.account.saldo != null ? Number(o.account.saldo) : null, totalPL: o.account.totalPL != null ? Number(o.account.totalPL) : null }
+      : null;
+    return { records, account, note: (records.length || (account && (account.saldo != null || account.totalPL != null))) ? "" : "Nada detetado. Preenche à mão." };
   } catch (e) { return { records: [], note: "Erro: " + String(e.message || e) }; }
 }
 

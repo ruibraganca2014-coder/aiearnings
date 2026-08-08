@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import EarningsEdge from "../EarningsEdge.jsx";
-import { getToken, setToken, clearToken, fetchAll, savePicks, login, fetchPositions, savePositions, fetchPrices, daysBetween, fetchHistory, saveHistory, extractDoc, fetchTrades, saveTrades, fetchEmails } from "./picks.js";
+import { getToken, setToken, clearToken, fetchAll, savePicks, login, fetchPositions, savePositions, fetchPrices, daysBetween, fetchHistory, saveHistory, extractDoc, fetchTrades, saveTrades, fetchEmails, fetchSettings, saveSettings } from "./picks.js";
 import { TRADES } from "./trades.js";
 import { WD, exchOf, fmtDay } from "./shared.js";
 
@@ -337,9 +337,14 @@ function HistoricoAdmin({ token, onAuthFail }) {
   const [draft, setDraft] = useState([]);
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
+  const [acct, setAcct] = useState({ saldo: "", totalPL: "", capitalBase: "2500" });
+  const [acctSaved, setAcctSaved] = useState(true);
   const inp = useRef(null);
 
-  useEffect(() => { fetchHistory().then(setHist); }, []);
+  useEffect(() => {
+    fetchHistory().then(setHist);
+    fetchSettings().then((s) => setAcct({ saldo: s.saldo != null ? String(s.saldo) : "", totalPL: s.totalPL != null ? String(s.totalPL) : "", capitalBase: s.capitalBase != null ? String(s.capitalBase) : "2500" }));
+  }, []);
 
   const onFile = (e) => {
     const f = e.target.files?.[0]; if (!f) return;
@@ -353,9 +358,15 @@ function HistoricoAdmin({ token, onAuthFail }) {
     try {
       const res = await extractDoc(token, img.data, img.mime);
       setDraft((res.records || []).map((r) => ({ ...emptyRec(), ...r, pct: r.pct ?? "", pnl: r.pnl ?? "" })));
-      setNote(res.note || "");
+      if (res.account) setAcct((a) => ({ saldo: res.account.saldo != null ? String(res.account.saldo) : a.saldo, totalPL: res.account.totalPL != null ? String(res.account.totalPL) : a.totalPL }));
+      setNote(res.note || (res.account && (res.account.saldo != null || res.account.totalPL != null) ? "Conta detetada — confirma e guarda." : ""));
     } catch (e) { if (String(e.message) === "401") return onAuthFail(); setNote("Erro na extração."); }
     setBusy(false);
+  };
+  const saveAcct = () => {
+    setAcctSaved(false);
+    saveSettings(token, { saldo: acct.saldo === "" ? null : Number(acct.saldo), totalPL: acct.totalPL === "" ? null : Number(acct.totalPL), capitalBase: acct.capitalBase === "" ? null : Number(acct.capitalBase) })
+      .then(() => setAcctSaved(true)).catch((e) => { if (String(e.message) === "401") onAuthFail(); });
   };
   const editRow = (i, k, v) => setDraft((d) => d.map((r, j) => j === i ? { ...r, [k]: v } : r));
   const addRow = () => setDraft((d) => [...d, emptyRec()]);
@@ -377,6 +388,19 @@ function HistoricoAdmin({ token, onAuthFail }) {
   return (
     <div>
       <div className="ad-bar">Histórico via documento · <b>{hist.length}</b> publicados · a extração é <b>assistida por IA</b> — confirma sempre antes de publicar.</div>
+
+      <div className="ad-form" style={{ alignItems: "center" }}>
+        <b style={{ fontSize: 13 }}>Conta (do documento) —</b>
+        <b style={{ fontSize: 13 }}>Saldo €:</b>
+        <input className="ad-note" style={{ maxWidth: 120 }} type="number" step="0.01" placeholder="ex. 2776.88" value={acct.saldo} onChange={(e) => setAcct({ ...acct, saldo: e.target.value })} />
+        <b style={{ fontSize: 13 }}>Total L/P €:</b>
+        <input className="ad-note" style={{ maxWidth: 120 }} type="number" step="0.01" placeholder="ex. 1153.15" value={acct.totalPL} onChange={(e) => setAcct({ ...acct, totalPL: e.target.value })} />
+        <b style={{ fontSize: 13 }}>Capital base €:</b>
+        <input className="ad-note" style={{ maxWidth: 100 }} type="number" step="0.01" placeholder="2500" value={acct.capitalBase} onChange={(e) => setAcct({ ...acct, capitalBase: e.target.value })} />
+        <button className="ad-btn sm" onClick={saveAcct}>Guardar conta</button>
+        <span style={{ color: acctSaved ? "#2FA37A" : "#D6A445", fontSize: 12 }}>{acctSaved ? "✓" : "…"}</span>
+        <span className="ad-muted" style={{ fontSize: 12 }}>a IA preenche do upload; confirma.</span>
+      </div>
 
       <div className="ad-form" style={{ alignItems: "flex-start" }}>
         <button className="ad-btn sm" onClick={() => inp.current?.click()}>＋ Escolher imagem/PDF</button>

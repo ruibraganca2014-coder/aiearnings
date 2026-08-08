@@ -84,6 +84,17 @@ export async function saveTrades(token, trades) {
   return r.json();
 }
 
+// ---- definições da conta (Saldo, Total L/P) ----
+export async function fetchSettings() {
+  try { const r = await fetch("/api/settings", { cache: "no-store" }); return r.ok ? await r.json() : {}; } catch { return {}; }
+}
+export async function saveSettings(token, settings) {
+  const r = await fetch("/api/settings", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + token }, body: JSON.stringify({ settings }) });
+  if (r.status === 401) throw new Error("401");
+  if (!r.ok) throw new Error("http " + r.status);
+  return r.json();
+}
+
 export async function login(password) {
   const r = await fetch("/api/auth/login", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ password }) });
   return r.json();

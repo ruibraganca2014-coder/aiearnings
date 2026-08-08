@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from "react";
-import { fetchPublished, fetchPositions, fetchPrices, daysBetween, subscribeEmail, fetchHistory } from "./picks.js";
+import { fetchPublished, fetchPositions, fetchPrices, daysBetween, subscribeEmail, fetchHistory, fetchSettings } from "./picks.js";
 import { WD, exchOf, fmtDay } from "./shared.js";
 
 const eur = (n) => (n < 0 ? "−" : "") + "€" + Math.abs(Math.round(n)).toLocaleString("pt-PT");
@@ -291,9 +291,15 @@ function Newsletter() {
 }
 
 function HistoricoCalendario() {
-  const [rows, setRows] = useState(null);
+  const [rows, setRows] = useState(null); // apostados (posições fechadas / upload)
+  const [mkt, setMkt] = useState([]); // mercado (não apostados) — motor
   useEffect(() => {
-    const load = () => fetchHistory().then(setRows);
+    const load = () => {
+      fetchHistory().then(setRows);
+      const from = new Date().toISOString().slice(0, 10);
+      const to = new Date(Date.now() + 3 * 864e5).toISOString().slice(0, 10);
+      fetch(`/api/yahoo/calendar?from=${from}&to=${to}`).then((r) => r.json()).then((a) => setMkt((a || []).filter((x) => x.past && x.reaction != null))).catch(() => {});
+    };
     load();
     const onVis = () => { if (!document.hidden) load(); };
     window.addEventListener("focus", load);
@@ -302,34 +308,36 @@ function HistoricoCalendario() {
     return () => { window.removeEventListener("focus", load); document.removeEventListener("visibilitychange", onVis); clearInterval(id); };
   }, []);
   const days = useMemo(() => {
-    if (!rows) return [];
+    const apostados = (rows || []).map((r) => ({ ...r, aposta: true }));
+    const apSet = new Set(apostados.map((r) => r.ticker));
+    const naoAp = mkt.filter((x) => !apSet.has(x.ticker) && exchOf(x.ticker) === "EUA").map((x) => ({ ticker: x.ticker, name: x.name, date: x.date, pct: Math.round(x.reaction * 10) / 10, exch: exchOf(x.ticker), aposta: false }));
     const g = {};
-    rows.forEach((r) => { (g[r.date] = g[r.date] || []).push(r); });
-    return Object.keys(g).sort((a, b) => b.localeCompare(a)).map((d) => ({ day: d, items: g[d] }));
-  }, [rows]);
-  if (!rows) return null; // ainda a carregar
-  if (!rows.length) return (
+    [...apostados, ...naoAp].filter((r) => r.date && daysBetween(r.date) <= 7).forEach((r) => { (g[r.date] = g[r.date] || []).push(r); }); // só últimos 7 dias
+    return Object.keys(g).sort((a, b) => b.localeCompare(a)).map((d) => ({ day: d, items: g[d].sort((a, b) => (b.aposta ? 1 : 0) - (a.aposta ? 1 : 0)) }));
+  }, [rows, mkt]);
+  if (rows === null) return null; // ainda a carregar
+  if (!days.length) return (
     <section id="site-hist" className="ts-sec">
       <h2>Histórico das posições anteriores</h2>
-      <p className="ts-lead">Sem histórico ainda. Aparece aqui quando fecho posições ou carrego resultados (por documento). Não é recomendação.</p>
+      <p className="ts-lead">Sem histórico ainda. Aparece aqui quando fecho posições ou há resultados recentes. Não é recomendação.</p>
     </section>
   );
   return (
     <section id="site-hist" className="ts-sec">
       <h2>Histórico das posições anteriores</h2>
-      <p className="ts-lead">Resultados anteriores (posições fechadas + documentos). <b>Análise assistida por IA</b> — informativo, não é recomendação.</p>
+      <p className="ts-lead">Posições fechadas/documentos <b>e resultados do mercado não apostados</b>. <b>Análise assistida por IA</b> — informativo, não é recomendação.</p>
       <div className="ts-week">
-        {days.slice(0, 4).map((grp) => (
+        {days.slice(0, 7).map((grp) => (
           <div className="ts-daycard" key={grp.day}>
             <div className="ts-dayhdr">{WD[new Date(grp.day + "T00:00:00").getDay()]} · {fmtDay(grp.day)}</div>
             {grp.items.map((r, i) => (
-              <div className="ts-prow" key={r.ticker + i}>
+              <div className={"ts-prow" + (r.aposta ? "" : " ts-prow--info")} key={r.ticker + i}>
                 <span className="ts-ptic">{r.ticker}</span>
                 <span className="ts-pex">{r.exch || "EUA"}</span>
                 <span className="ts-pname">{r.name}</span>
                 {r.pct != null && <span style={{ color: r.pct < 0 ? "#C8553D" : "#2FA37A", fontFamily: "'IBM Plex Mono',monospace" }}>{r.pct >= 0 ? "▲ +" : "▼ "}{r.pct}%</span>}
                 {r.pnl != null && <span style={{ color: r.pnl < 0 ? "#C8553D" : "#2FA37A", fontFamily: "'IBM Plex Mono',monospace" }}>{r.pnl >= 0 ? "+€" : "−€"}{Math.abs(r.pnl)}</span>}
-                <span className="ts-aitag" title="Análise assistida por IA">IA</span>
+                {r.aposta ? <span className="ts-aitag" title="Análise assistida por IA">IA</span> : <span className="ts-naotag" title="Resultado do mercado — não apostado">não apostado</span>}
               </div>
             ))}
           </div>
@@ -344,9 +352,10 @@ export default function TraderSite() {
   const [hist, setHist] = useState([]);
   const [openPos, setOpenPos] = useState([]);
   const [posPrices, setPosPrices] = useState({});
+  const [settings, setSettings] = useState({});
   useEffect(() => {
     const load = () => {
-      fetchPublished().then(setPicks); fetchHistory().then((h) => setHist(Array.isArray(h) ? h : []));
+      fetchPublished().then(setPicks); fetchHistory().then((h) => setHist(Array.isArray(h) ? h : [])); fetchSettings().then(setSettings);
       fetchPositions().then((p) => { const a = Array.isArray(p) ? p : []; setOpenPos(a); fetchPrices(a.map((x) => x.ticker)).then(setPosPrices); });
     };
     load();
@@ -366,7 +375,11 @@ export default function TraderSite() {
     const acerto = pred.length ? Math.round(hits / pred.length * 100) : null;
     return { n, subiu, avgPct, acerto };
   }, [hist]);
-  const totalPL = hist.reduce((a, r) => a + (Number(r.pnl) || 0), 0); // resultado total = soma de todos os trades do histórico
+  const histSum = hist.reduce((a, r) => a + (Number(r.pnl) || 0), 0);
+  const totalPL = settings.totalPL != null ? Number(settings.totalPL) : histSum; // Total L/P: da conta DEGIRO (upload) ou soma do histórico
+  const saldo = settings.saldo != null ? Number(settings.saldo) : null; // saldo da conta (DEGIRO, via upload)
+  const capitalBase = settings.capitalBase != null ? Number(settings.capitalBase) : 2500; // capital fixo do método
+  const lucroMes = saldo != null ? saldo - capitalBase : null; // lucro do mês = acima do capital base (retira no início do mês)
   // L/P por período — soma automática dos ganhos do histórico por janela de data
   const plPer = hist.length ? [["3 dias", 3], ["7 dias", 7], ["1 mês", 30]].map(([l, d]) => ({
     l, v: hist.reduce((a, r) => { const age = r.date ? daysBetween(r.date) : 1e9; return age >= 0 && age <= d ? a + (Number(r.pnl) || 0) : a; }, 0),
@@ -387,7 +400,6 @@ export default function TraderSite() {
         <nav>
           <a href="#site" onClick={() => window.scrollTo({ top: 0 })}>Início</a>
           <a href="#site-metodo">Método</a>
-          <a href="#site-stats">Estatísticas</a>
           <a href="#site-prev">Previsões</a>
           <a href="#site-pos">Posições</a>
           <a href="#site-hist">Histórico</a>
@@ -400,12 +412,6 @@ export default function TraderSite() {
       <section className="ts-hero">
         <h1>Resultados trimestrais, descodificados semana a semana</h1>
         <p>Probabilidade de uma ação <b>subir ou descer</b> nos resultados trimestrais, por análise de IA sobre dados de mercado (EUA + Europa). Não é aconselhamento financeiro — é leitura de probabilidades.</p>
-        <div className="ts-herostats">
-          {stats.acerto != null && <div><b>{stats.acerto}%</b><span>acerto das previsões</span></div>}
-          <div><b>{stats.n}</b><span>resultados analisados</span></div>
-          <div><b>{stats.subiu}%</b><span>que subiram</span></div>
-          {totalPL !== 0 && <div><b style={{ color: totalPL >= 0 ? "#2FA37A" : "#C8553D" }}>{totalPL >= 0 ? "+" : ""}{eur(totalPL)}</b><span>resultado total</span></div>}
-        </div>
         <div className="ts-herocta">
           <a href="#site-metodo" className="ts-btn">Ver o método</a>
           <a href="#site-news" className="ts-btn ts-btnghost">Receber alertas</a>
@@ -413,22 +419,20 @@ export default function TraderSite() {
         <div className="ts-herowarn">Conteúdo informativo — indicativo, não prova de edge. Alta variância. Não é aconselhamento financeiro.</div>
       </section>
 
-      <Metodo />
-
-      <section id="site-stats" className="ts-sec">
-        <h2>Estatísticas</h2>
-        <p className="ts-lead">Desempenho das previsões de direção (IA) sobre o histórico. São <b>probabilidades, não garantias</b> — amostra pequena, alta variância.</p>
+      <section className="ts-sec ts-topstats">
         <div className="ts-statgrid">
           <div className="ts-stat"><b style={{ color: "#D6A445" }}>{stats.acerto != null ? stats.acerto + "%" : "—"}</b><span>acerto das previsões</span><small>previu a direção certa</small></div>
           <div className="ts-stat"><b>{stats.n}</b><span>resultados analisados</span><small>apresentações no histórico</small></div>
           <div className="ts-stat"><b>{stats.subiu}%</b><span>que subiram</span><small>subiram nos resultados</small></div>
-          <div className="ts-stat"><b style={{ color: totalPL >= 0 ? "#2FA37A" : "#C8553D" }}>{totalPL >= 0 ? "+" : ""}{eur(totalPL)}</b><span>resultado total</span><small>soma dos trades · média {stats.avgPct >= 0 ? "+" : ""}{stats.avgPct.toFixed(1)}%/trade</small></div>
+          <div className="ts-stat"><b style={{ color: totalPL >= 0 ? "#2FA37A" : "#C8553D" }}>{totalPL >= 0 ? "+" : ""}{eur(totalPL)}</b><span>resultado total (L/P)</span><small>{settings.totalPL != null ? "conta DEGIRO" : "soma dos trades"} · média {stats.avgPct >= 0 ? "+" : ""}{stats.avgPct.toFixed(1)}%/trade</small></div>
+          {saldo != null && <div className="ts-stat"><b>{eur(saldo)}</b><span>saldo da conta</span><small>capital atual (DEGIRO)</small></div>}
+          {lucroMes != null && <div className="ts-stat"><b style={{ color: lucroMes >= 0 ? "#2FA37A" : "#C8553D" }}>{lucroMes >= 0 ? "+" : ""}{eur(lucroMes)}</b><span>lucro do mês</span><small>acima de {eur(capitalBase)} · retira no início do mês</small></div>}
           {plPer.map((p) => <div className="ts-stat" key={p.l}><b style={{ color: p.v > 0 ? "#2FA37A" : p.v < 0 ? "#C8553D" : "var(--tx)" }}>{p.v >= 0 ? "+" : ""}{eur(p.v)}</b><span>L/P {p.l}</span><small>ganho/perda no período</small></div>)}
         </div>
         <div className="ts-note">Resultados passados não garantem futuros. Não é aconselhamento financeiro; é análise probabilística assistida por IA.</div>
       </section>
 
-      <HistoricoCalendario />
+      <Metodo />
 
       <section id="site-prev" className="ts-sec">
         <h2>Previsões desta semana</h2>
@@ -437,6 +441,8 @@ export default function TraderSite() {
         <Featured picks={picks} suspenso={suspenso} />
         <Predictions picks={picks} suspenso={suspenso} />
       </section>
+
+      <HistoricoCalendario />
 
       <Positions />
 
@@ -527,6 +533,7 @@ const CSS = `
 .ts-pname{color:var(--mut);flex:1;min-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .ts-pwhen{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--mut);}
 .ts-plock{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--gold);}
+.ts-topstats{border-top:none;padding-top:4px;margin-top:-8px;}
 .ts-statgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;}
 .ts-stat{background:var(--s1);border:1px solid var(--line);border-radius:12px;padding:16px;text-align:center;}
 .ts-stat b{font-family:'IBM Plex Mono',monospace;font-size:30px;display:block;}
@@ -552,6 +559,8 @@ const CSS = `
 .ts-ftdet>div b{color:var(--tx);font-family:'IBM Plex Mono',monospace;}
 .ts-ftwarn{display:block!important;color:#f0d9a8;font-size:11px;line-height:1.4;background:rgba(214,164,69,.1);border-radius:6px;padding:8px;margin-top:4px;}
 .ts-pbadge{color:#0E1620;font-weight:700;font-size:10.5px;padding:1px 7px;border-radius:5px;font-family:'IBM Plex Mono',monospace;}
+.ts-naotag{font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:var(--mut);border:1px solid var(--line);border-radius:4px;padding:0 5px;}
+.ts-prow--info{opacity:.72;}
 .ts-aitag{font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:var(--gold);border:1px solid var(--gold);border-radius:4px;padding:0 4px;vertical-align:middle;letter-spacing:.05em;}
 .ts-note{margin-top:16px;background:rgba(214,164,69,.1);border:1px solid var(--line);border-radius:10px;padding:12px 14px;font-size:12.5px;color:#f0d9a8;line-height:1.5;}
 .ts-herocta{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-bottom:14px;}
