@@ -410,6 +410,7 @@ async function _realQuote(sym, opts = {}) {
     ticker: sym,
     name: qs.price?.longName || qs.price?.shortName || sym,
     price: price != null ? r2(price) : null,
+    currency: qs.price?.currency || "USD",
     earningsDate: earningsDateStr,
     impliedMove: opt?.impliedMove ?? avgHist,
     impliedSource: opt?.impliedSource ?? "estimativa (média histórica das reações)",

@@ -299,7 +299,7 @@ function DestaqueAdmin({ token, onAuthFail }) {
         signals: q.lean?.signals || null, reactions: Array.isArray(q.reactions) ? q.reactions : null,
         reactionStd: q.reactionStd ?? null, reactionLow: q.reactionLow ?? null, reactionHigh: q.reactionHigh ?? null,
         reactionMin: q.reactionMin ?? null, reactionMax: q.reactionMax ?? null, reactionN: q.reactionN ?? null, shortPct: q.shortPct ?? null,
-        website: q.website || all[key].website || "", isin: isin || all[key].isin || null,
+        website: q.website || all[key].website || "", isin: isin || all[key].isin || null, currency: q.currency || all[key].currency || "USD",
       };
       await savePicks(token, all);
       setPicks(all); setSaved(true);

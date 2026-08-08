@@ -428,6 +428,7 @@ export default function EarningsEdge() {
       reactionMin: item.reactionMin ?? null, reactionMax: item.reactionMax ?? null, reactionN: item.reactionN ?? null,
       shortPct: item.shortPct ?? null, buyBy: cal?.buyBy || cur.buyBy || null,
       website: item.website || cur.website || "", // p/ logo (Clearbit)
+      currency: item.currency || cur.currency || "USD",
       nota: cur.nota || item.llm?.reasoning || "",
       // pesquisa aprofundada (texto das 5 análises) — só o texto, para mostrar no site
       research: (() => {

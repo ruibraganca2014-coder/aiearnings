@@ -3,6 +3,8 @@ import { fetchPublished, fetchPositions, fetchPrices, daysBetween, subscribeEmai
 import { WD, exchOf, fmtDay } from "./shared.js";
 
 export const eur = (n) => (n < 0 ? "−" : "") + "€" + Math.abs(Math.round(n)).toLocaleString("pt-PT");
+const CUR_SYM = { USD: "$", EUR: "€", GBP: "£", JPY: "¥", CHF: "CHF ", CAD: "C$", AUD: "A$", HKD: "HK$", SGD: "S$", NOK: "kr ", DKK: "kr ", SEK: "kr ", PLN: "zł " };
+export const fmtPrice = (v, cur = "USD") => v == null ? "—" : (CUR_SYM[cur] || cur + " ") + Number(v).toLocaleString("pt-PT", { maximumFractionDigits: 2 });
 const recoColor = (r) => r === "SUBIR" ? "#2FA37A" : r === "DESCER" ? "#C8553D" : "#D6A445"; // SUBIR verde · DESCER vermelho · NEUTRO dourado
 export const probColor = (v) => v == null ? "#8CA3B3" : v >= 55 ? "#2FA37A" : v <= 45 ? "#C8553D" : "#D6A445"; // cor pela probabilidade de subir
 
@@ -136,7 +138,7 @@ export function StockModal({ pick, onClose }) {
         <div className="ts-mmetrics">
           <M l="Probabilidade de subir" v={p.probUp != null ? p.probUp + "%" : null} c={probColor(p.probUp)} />
           <M l="Valor esperado" v={p.ev != null ? (p.ev >= 0 ? "+" : "") + p.ev + "%" : null} c={p.ev >= 0 ? "#2FA37A" : "#C8553D"} />
-          <M l="Preço" v={p.price != null ? "$" + p.price : null} />
+          <M l="Preço" v={p.price != null ? fmtPrice(p.price, p.currency) : null} />
           <M l={p.earningsDate ? "Resultados" : "Entrar"} v={(p.earningsDate || p.entryISO) ? fmtDay(p.earningsDate || p.entryISO) : null} />
           <M l="Gap médio" v={p.gapAvg != null ? (p.gapAvg >= 0 ? "+" : "") + p.gapAvg + "%" + (p.gapPctUp != null ? ` · ${p.gapPctUp}%↑` : "") : null} c={p.gapAvg >= 0 ? "#2FA37A" : "#C8553D"} />
           <M l="Movimento implícito" v={p.impliedMove != null ? "±" + p.impliedMove + "%" : null} />
@@ -184,9 +186,9 @@ function TraderPick({ pick, onDetail }) {
         <div className="ts-tpplan">
           <div className="ts-tpplanstep"><span>1 · Entrada</span><b>{entryTxt || (p.entryISO ? fmtDay(p.entryISO) : "—")}</b></div>
           <span className="ts-tpplanarr">→</span>
-          <div className="ts-tpplanstep"><span>2 · Alvo</span><b style={{ color: "#2FA37A" }}>{target ? `$${target.px} (${target.up >= 0 ? "+" : ""}${target.up}%)` : "—"}</b></div>
+          <div className="ts-tpplanstep"><span>2 · Alvo</span><b style={{ color: "#2FA37A" }}>{target ? `${fmtPrice(target.px, p.currency)} (${target.up >= 0 ? "+" : ""}${target.up}%)` : "—"}</b></div>
           <span className="ts-tpplanarr">→</span>
-          <div className="ts-tpplanstep ts-tpplanstop"><span>3 · Stop</span><b style={{ color: "#C8553D" }}>−10%{stopPx ? ` · $${stopPx}` : ""}</b></div>
+          <div className="ts-tpplanstep ts-tpplanstop"><span>3 · Stop</span><b style={{ color: "#C8553D" }}>−10%{stopPx ? ` · ${fmtPrice(stopPx, p.currency)}` : ""}</b></div>
         </div>
 
         {/* Decisão */}
@@ -202,7 +204,7 @@ function TraderPick({ pick, onDetail }) {
         <div className="ts-tpgroup">
           <h4>Mercado</h4>
           <div className="ts-ftgrid">
-            {p.price != null && <FtCell l="Preço" v={"$" + p.price} />}
+            {p.price != null && <FtCell l="Preço" v={fmtPrice(p.price, p.currency)} />}
             {p.gapAvg != null && <FtCell l="Gap médio" v={(p.gapAvg >= 0 ? "+" : "") + p.gapAvg + "%"} c={p.gapAvg >= 0 ? "#2FA37A" : "#C8553D"} sub={p.gapPctUp != null ? p.gapPctUp + "% sobem" : ""} sig={p.gapAvg} sigmax={10} />}
             {p.impliedMove != null && <FtCell l="Mov. implícito" v={"±" + p.impliedMove + "%"} fill={Math.min(100, p.impliedMove * 5)} fillc="#8CA3B3" />}
             {p.momentum != null && <FtCell l="Momentum 1m" v={(p.momentum >= 0 ? "+" : "") + p.momentum + "%"} c={p.momentum >= 0 ? "#2FA37A" : "#C8553D"} sig={p.momentum} sigmax={15} />}
@@ -318,17 +320,16 @@ function Predictions({ picks, suspenso, onDetail }) {
   const [err, setErr] = useState("");
   useEffect(() => {
     const from = new Date().toISOString().slice(0, 10);
-    const to = new Date(Date.now() + 14 * 864e5).toISOString().slice(0, 10);
+    const to = new Date(Date.now() + 21 * 864e5).toISOString().slice(0, 10); // 21 dias
     fetch(`/api/yahoo/calendar?from=${from}&to=${to}`)
       .then((r) => r.json())
-      .then((a) => setRows((a || []).filter((x) => !x.past).slice(0, 24)))
+      .then((a) => setRows((a || []).filter((x) => !x.past)))
       .catch((e) => setErr(String(e.message || e)));
   }, []);
   const groups = useMemo(() => {
     if (!rows) return [];
     const us = [...rows]
-      .sort((a, b) => (a.entryISO || a.date || "").localeCompare(b.entryISO || b.date || ""))
-      .slice(0, 8); // as próximas 8 previsões (todos os mercados)
+      .sort((a, b) => (a.entryISO || a.date || "").localeCompare(b.entryISO || b.date || "")); // todas na janela (sem limite)
     const g = {};
     for (const it of us) { const k = it.entryISO || it.date; (g[k] = g[k] || []).push(it); }
     return Object.keys(g).sort().map((k) => ({ day: k, items: g[k] }));

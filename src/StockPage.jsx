@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { fetchLedger } from "./picks.js";
-import { CSS, Spark, Mono, CompanyLogo, eur, probColor, goStock } from "./TraderSite.jsx";
+import { CSS, Spark, Mono, CompanyLogo, eur, fmtPrice, probColor, goStock } from "./TraderSite.jsx";
 import { fmtDay } from "./shared.js";
 
 // Página de detalhe de uma ação: cotação + gráfico, próximos resultados, probabilidade IA,
@@ -45,7 +45,7 @@ export default function StockPage({ ticker }) {
                 <div className="sp-sub">{isin ? "ISIN " + isin + " · " : ""}{q.earningsDate ? "próximos resultados " + fmtDay(q.earningsDate) : "sem data de resultados"}</div>
               </div>
               <div className="sp-price">
-                <b>{q.price != null ? "$" + q.price : "—"}</b>
+                <b>{q.price != null ? fmtPrice(q.price, q.currency) : "—"}</b>
                 {q.lean?.probUp != null && <span className="sp-prob" style={{ color: probColor(q.lean.probUp) }}>↑ {q.lean.probUp}% probabilidade de subir</span>}
               </div>
             </div>
