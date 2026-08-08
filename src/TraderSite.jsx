@@ -322,19 +322,20 @@ function Predictions({ picks, suspenso, onDetail }) {
   const [err, setErr] = useState("");
   useEffect(() => {
     const from = new Date().toISOString().slice(0, 10);
-    const to = new Date(Date.now() + 8 * 864e5).toISOString().slice(0, 10); // 8 dias
+    const to = new Date(Date.now() + 28 * 864e5).toISOString().slice(0, 10); // janela larga; corta-se por nº de dias abaixo
     fetch(`/api/yahoo/calendar?from=${from}&to=${to}`)
       .then((r) => r.json())
       .then((a) => setRows((a || []).filter((x) => !x.past)))
       .catch((e) => setErr(String(e.message || e)));
   }, []);
+  const DAYS_SHOWN = 7; // mostra os primeiros 7 dias com resultados
   const groups = useMemo(() => {
     if (!rows) return [];
     const us = [...rows]
-      .sort((a, b) => (a.entryISO || a.date || "").localeCompare(b.entryISO || b.date || "")); // todas na janela (sem limite)
+      .sort((a, b) => (a.entryISO || a.date || "").localeCompare(b.entryISO || b.date || ""));
     const g = {};
     for (const it of us) { const k = it.entryISO || it.date; (g[k] = g[k] || []).push(it); }
-    return Object.keys(g).sort().map((k) => ({ day: k, items: g[k] }));
+    return Object.keys(g).sort().slice(0, DAYS_SHOWN).map((k) => ({ day: k, items: g[k] }));
   }, [rows]);
   if (err) return <div className="ts-muted">Não foi possível carregar a agenda ({err}).</div>;
   if (!rows) return <div className="ts-muted">A carregar a agenda da semana…</div>;
