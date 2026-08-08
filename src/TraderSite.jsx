@@ -354,7 +354,22 @@ function Predictions({ picks, suspenso, onDetail }) {
                 <span className="ts-pex">{exchOf(it.ticker)}</span>
                 <span className="ts-pnamewrap"><span className="ts-pname">{fmtName(it.name)}</span>{it.sector && THEME_LABELS[it.sector] && <span className="ts-themetag">{THEME_LABELS[it.sector]}</span>}</span>
                 <span className="ts-pwhen">{it.when === "BMO" ? "pré-abertura" : it.when === "AMC" ? "após fecho" : ""}</span>
-                {!suspenso && picks[it.ticker]?.show && (() => { const p2 = picks[it.ticker]; const parts = []; if (p2.confidence != null) parts.push("conf " + p2.confidence + "%"); if (p2.ev != null) parts.push("EV " + (p2.ev >= 0 ? "+" : "") + p2.ev + "%"); if (p2.gapUp != null) parts.push("gap↑ " + p2.gapUp + "%"); if (p2.impliedMove != null) parts.push("±" + p2.impliedMove + "%"); return parts.length ? <span className="ts-pmetrics">{parts.join(" · ")}</span> : null; })()}
+                {!suspenso && picks[it.ticker]?.show && (() => {
+                  const p2 = picks[it.ticker];
+                  const parts = [];
+                  if (p2.confidence != null) parts.push("conf " + p2.confidence + "%");
+                  if (p2.ev != null) parts.push("EV " + (p2.ev >= 0 ? "+" : "") + p2.ev + "%");
+                  if (p2.gapUp != null) parts.push("gap↑ " + p2.gapUp + "%");
+                  if (p2.impliedMove != null) parts.push("±" + p2.impliedMove + "%");
+                  // mercados sem dados de reação (fora dos EUA): preenche com o que existe, para a linha não ficar vazia
+                  if (parts.length <= 1) {
+                    if (p2.momentum != null) parts.push("mom " + (p2.momentum >= 0 ? "+" : "") + p2.momentum + "%");
+                    if (p2.rsi != null) parts.push("RSI " + p2.rsi);
+                    if (p2.analyst) parts.push(p2.analyst === "bullish" ? "analistas otimistas" : p2.analyst === "bearish" ? "analistas pessimistas" : "analistas neutros");
+                    if (parts.length <= 1) parts.push("análise de reação limitada");
+                  }
+                  return parts.length ? <span className="ts-pmetrics">{parts.join(" · ")}</span> : null;
+                })()}
                 {suspenso
                   ? <span className="ts-pbadge" style={{ background: "#8CA3B3" }}>SUSPENSO</span>
                   : picks[it.ticker]?.show && picks[it.ticker]?.probUp != null
