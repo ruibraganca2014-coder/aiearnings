@@ -326,6 +326,7 @@ function HistoricoCalendario() {
                 <span className="ts-pname">{r.name}</span>
                 {r.pct != null && <span style={{ color: r.pct < 0 ? "#C8553D" : "#2FA37A", fontFamily: "'IBM Plex Mono',monospace" }}>{r.pct >= 0 ? "▲ +" : "▼ "}{r.pct}%</span>}
                 {r.pnl != null && <span style={{ color: r.pnl < 0 ? "#C8553D" : "#2FA37A", fontFamily: "'IBM Plex Mono',monospace" }}>{r.pnl >= 0 ? "+€" : "−€"}{Math.abs(r.pnl)}</span>}
+                {r.aposta && r.predicted && r.predicted !== "NEUTRO" && (() => { const hit = (r.predicted === "SUBIR" && r.pct > 0) || (r.predicted === "DESCER" && r.pct < 0); return <span className="ts-predtag" title="Previsão dada nas previsões vs resultado real" style={{ color: hit ? "#2FA37A" : "#C8553D" }}>previu {r.predicted === "SUBIR" ? "↑" : "↓"} {hit ? "✓" : "✕"}</span>; })()}
                 {r.aposta ? <span className="ts-aitag" title="Análise assistida por IA">IA</span> : <span className="ts-naotag" title="Resultado do mercado — não apostado">não apostado</span>}
               </div>
             ))}
@@ -550,6 +551,7 @@ const CSS = `
 .ts-pmetrics{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--mut);white-space:nowrap;}
 .ts-pbadge{color:#0E1620;font-weight:700;font-size:10.5px;padding:1px 7px;border-radius:5px;font-family:'IBM Plex Mono',monospace;}
 .ts-naotag{font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:var(--mut);border:1px solid var(--line);border-radius:4px;padding:0 5px;}
+.ts-predtag{font-family:'IBM Plex Mono',monospace;font-size:10.5px;}
 .ts-prow--info{opacity:.72;}
 .ts-aitag{font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:var(--gold);border:1px solid var(--gold);border-radius:4px;padding:0 4px;vertical-align:middle;letter-spacing:.05em;}
 .ts-note{margin-top:16px;background:rgba(214,164,69,.1);border:1px solid var(--line);border-radius:10px;padding:12px 14px;font-size:12.5px;color:#f0d9a8;line-height:1.5;}
