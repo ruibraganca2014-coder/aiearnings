@@ -331,14 +331,21 @@ function Predictions({ picks, suspenso, onDetail }) {
       .then((a) => setRows((a || []).filter((x) => !x.past)))
       .catch((e) => setErr(String(e.message || e)));
   }, []);
-  const DAYS_SHOWN = 7; // mostra os primeiros 7 dias com resultados
+  const DAYS_SHOWN = 7; // 7 dias úteis seguidos a partir do 1º dia com resultados (inclui sexta, mesmo sem resultados)
   const groups = useMemo(() => {
     if (!rows) return [];
-    const us = [...rows]
-      .sort((a, b) => (a.entryISO || a.date || "").localeCompare(b.entryISO || b.date || ""));
     const g = {};
-    for (const it of us) { const k = it.entryISO || it.date; (g[k] = g[k] || []).push(it); }
-    return Object.keys(g).sort().slice(0, DAYS_SHOWN).map((k) => ({ day: k, items: g[k] }));
+    for (const it of rows) { const k = it.entryISO || it.date; (g[k] = g[k] || []).push(it); }
+    const keys = Object.keys(g).sort();
+    if (!keys.length) return [];
+    const out = [];
+    let d = new Date(keys[0] + "T00:00:00Z"); // UTC para evitar desvio de fuso
+    while (out.length < DAYS_SHOWN) {
+      const wd = d.getUTCDay();
+      if (wd !== 0 && wd !== 6) { const k = d.toISOString().slice(0, 10); out.push({ day: k, items: g[k] || [] }); }
+      d = new Date(d.getTime() + 864e5);
+    }
+    return out;
   }, [rows]);
   if (err) return <div className="ts-muted">Não foi possível carregar a agenda ({err}).</div>;
   if (!rows) return <div className="ts-muted">A carregar a agenda da semana…</div>;
@@ -346,10 +353,11 @@ function Predictions({ picks, suspenso, onDetail }) {
   return (
     <div className="ts-week">
       {groups.map((grp) => {
-        const wd = WD[new Date(grp.day + "T00:00:00").getDay()];
+        const wd = WD[new Date(grp.day + "T00:00:00Z").getUTCDay()];
         return (
           <div className="ts-daycard" key={grp.day}>
             <div className="ts-dayhdr">{wd} · {fmtDay(grp.day)} <span>entrar até ~fecho</span></div>
+            {!grp.items.length && <div className="ts-muted" style={{ padding: "8px 0", fontSize: 13 }}>Sem resultados agendados neste dia.</div>}
             {grp.items.map((it) => (
               <div className="ts-prow ts-prow--exp" key={(it.entryISO || it.date) + it.ticker + it.when}
                 onClick={() => onDetail && onDetail(picks[it.ticker] || { ticker: it.ticker, name: it.name, exch: exchOf(it.ticker), entryISO: it.entryISO, date: it.date })}
