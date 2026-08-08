@@ -510,15 +510,6 @@ function Metodo({ ledger }) {
         ))}
       </div>
 
-      {led && led.n > 0 && (
-        <div className="ts-metstats">
-          <span>Do meu histórico real ({led.n} trades):</span>
-          <b>{led.winRate}% acerto</b> · <b>hold {led.avgHold}d</b> · <b>{led.avgPct >= 0 ? "+" : ""}{led.avgPct}%/trade</b>
-          {led.best && <> · melhor <b style={{ color: "#2FA37A" }}>+{led.best.pct}%</b></>}
-          {led.worst && <> · pior <b style={{ color: "#C8553D" }}>{led.worst.pct}%</b></>}
-        </div>
-      )}
-
       <div className="ts-metwarn">
         <b>⚠ Risco elevado e assumido.</b> Uso <b>margem</b> (posso perder mais do que o capital investido) e <b>concentro tudo numa única ação</b>. A direção de uma ação nos resultados é quase uma <b>moeda ao ar</b> — não há edge provado e a variância é alta. Um único mau trade apaga vários bons. Podes perder todo o capital. Isto é <b>opinião/educação</b>, não recomendação nem aconselhamento financeiro. Faz a tua própria análise.
       </div>
@@ -1117,8 +1108,6 @@ export const CSS = `
 .ts-exemplo ul{list-style:none;padding:0;margin:0 0 10px;}
 .ts-exemplo li{font-size:13.5px;padding:4px 0;border-bottom:1px solid var(--line);color:var(--tx);}
 .ts-exnote{font-size:11.5px;color:var(--mut);line-height:1.5;}.ts-exnote a{color:var(--gold);}
-.ts-metstats{background:rgba(214,164,69,.06);border:1px solid var(--line);border-radius:10px;padding:11px 14px;font-size:13px;color:var(--mut);margin-bottom:16px;}
-.ts-metstats b{font-family:'IBM Plex Mono',monospace;color:var(--tx);}
 .ts-metwarn{background:rgba(47,163,122,.10);border:1px solid var(--grn);border-radius:12px;padding:14px 16px;font-size:13px;line-height:1.6;color:#cdeadd;}
 .ts-metwarn b{color:#fff;}
 /* grupos de balões */
