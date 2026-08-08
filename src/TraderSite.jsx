@@ -117,6 +117,53 @@ function TraderPick({ pick }) {
   );
 }
 
+// Secção educativa — respostas honestas (acordeão). Reforça transparência e SEO.
+const EDU = [
+  {
+    q: "O que são ações?",
+    a: "Uma ação é uma fatia de propriedade de uma empresa. Quando compras, passas a dono de uma pequena parte. O preço sobe e desce conforme o que o mercado acha que a empresa vale — lucros, notícias, expectativas. Ganhas se venderes mais caro do que compraste (ou por dividendos). Não há garantia de subir: podes perder parte, ou todo, o capital.",
+  },
+  {
+    q: "A “lei dos grandes números” torna isto seguro, como um casino?",
+    a: "Não — e é um erro perigoso. O casino ganha porque tem vantagem matemática (house edge) em cada jogada; a lei dos grandes números faz essa vantagem dominar ao fim de muitas apostas. O casino é a casa. Prever a direção de uma ação nos resultados é ~moeda ao ar (≈50/50), sem vantagem provada. Sem vantagem, a lei dos grandes números trabalha CONTRA ti: convergirias para zero menos custos (comissões, juro de margem, câmbio). Muitas jogadas só garantem lucro para quem tem edge.",
+  },
+  {
+    q: "“Só perco se a empresa falir” — é verdade?",
+    a: "Falso. Realizas perda assim que vendes abaixo do preço de compra (já aconteceu: GOOG −7,7%). Uma ação pode ficar em baixo anos, ou nunca recuperar, sem falir. E com margem podes ter um margin call: a corretora vende à força no pior momento e podes perder MAIS do que investiste. Basta um gap de −30% nos resultados (comuns) para limpar uma conta alavancada. A falência é só o pior caso — há muitas formas de perder antes disso.",
+  },
+  {
+    q: "O que é a margem (alavancagem) e porque é perigosa?",
+    a: "Margem é dinheiro emprestado pela corretora para comprares mais do que o teu capital. Amplifica os ganhos — mas amplifica na mesma medida as perdas, cobra juro diário, e pode forçar a venda (margin call) quando a posição cai. Em overnight de resultados, onde os gaps são grandes, é dos usos mais arriscados. Uso margem neste método; por isso o risco é elevado e assumido.",
+  },
+  {
+    q: "Bater as estimativas garante que a ação sobe?",
+    a: "Não. É comum uma empresa bater as estimativas e mesmo assim a ação cair — o chamado “sell-the-news” (o bom resultado já estava no preço). Por isso prever a DIREÇÃO é mais difícil do que prever se bate a estimativa. Trato tudo como probabilidade, nunca como certeza.",
+  },
+  {
+    q: "Então porquê seguir isto?",
+    a: "Como educação e entretenimento, com total transparência — mostro os trades reais (ganhos E perdas) tirados do extrato do broker. Não vendo certezas nem um “sistema que não perde”. É opinião pessoal e análise assistida por IA, não recomendação nem aconselhamento financeiro. Investe só o que podes perder e faz a tua própria análise.",
+  },
+];
+function Educacao() {
+  const [open, setOpen] = useState(null);
+  return (
+    <section id="site-edu" className="ts-sec">
+      <h2>Aprende — educação</h2>
+      <p className="ts-lead">Sem jargão, sem promessas. O essencial para perceberes o risco antes de arriscares. Não é aconselhamento financeiro.</p>
+      <div className="ts-edu">
+        {EDU.map((it, i) => (
+          <div className={"ts-eduitem" + (open === i ? " open" : "")} key={i}>
+            <button className="ts-eduq" onClick={() => setOpen(open === i ? null : i)}>
+              <span className={"ts-caret" + (open === i ? " open" : "")}>▸</span> {it.q}
+            </button>
+            {open === i && <div className="ts-edua">{it.a}</div>}
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 const POSTS = [
   { tag: "Educação", title: "O que é o gap de earnings", body: "A reação imediata de uma ação aos resultados (fecho antes → abertura depois). É das jogadas mais imprevisíveis — bater estimativas não garante subir (sell-the-news)." },
   { tag: "Risco", title: "Porque o tamanho da posição manda", body: "Um único gap de −10% pode apagar 4-5 pequenos ganhos. Arriscar só uma fração pequena da conta por trade é o que te mantém no jogo. Nunca com alavancagem em overnight de earnings." },
@@ -319,23 +366,80 @@ function Positions() {
   );
 }
 
-function Metodo() {
+function Metodo({ ledger }) {
+  const led = ledger?.stats || null;
+  const ex = (ledger?.trades || []).find((t) => t.ticker === "NET") || (ledger?.trades || []).find((t) => t.pl > 0) || null;
   const steps = [
-    { n: "1", t: "Capital fixo", d: "Trabalho sempre com o mesmo montante (ex. €2.500). Não aumento a exposição quando corre bem." },
+    { n: "1", t: "Capital fixo", d: "Trabalho sempre com o mesmo montante base (€2.500). Uma posição de cada vez, com o capital todo nessa ação. Não aumento a exposição quando corre bem." },
     { n: "2", t: "Análise por IA", d: "Antes de entrar, vejo a probabilidade de a ação subir ou descer nos resultados (dados de mercado + IA). É probabilidade, não garantia." },
-    { n: "3", t: "Entrar antes dos resultados", d: "Compro pouco antes do anúncio da empresa. Uma posição de cada vez, sem alavancagem." },
-    { n: "4", t: "Diversificar e gerir risco", d: "Não concentro tudo numa ação; arrisco apenas uma fração do capital. Sobreviver às perdas é o que interessa." },
-    { n: "5", t: "Se cair, esperar", d: "Não realizo perda no imediato — aguardo recuperar ao preço de compra (contador na secção Posições). Risco: nem toda a ação recupera." },
+    { n: "3", t: "Entrar antes dos resultados", d: "Compro pouco antes do anúncio. Uso margem da DEGIRO para reforçar a posição — a margem amplifica os ganhos, mas amplifica na mesma medida as perdas." },
+    { n: "4", t: "Concentração assumida (risco)", d: "Concentro tudo numa só ação, com margem. Não é diversificado: é risco alto e assumido — uma única perda grande pesa muito. Faço-o por convicção no sinal, não porque é seguro." },
+    { n: "5", t: "Se cair, esperar — com stop", d: "Se cai, espero recuperar o preço de compra (contador na secção Posições). Mas corto se a queda passar de −10%. Sem limite de tempo. Risco: nem toda a ação recupera." },
     { n: "6", t: "Retirar o lucro", d: "Ao fim do mês retiro o ganho e reponho o capital no valor base. Limitar exposição, não multiplicar risco." },
+  ];
+  const regras = [
+    ["Capital base", "€2.500"],
+    ["Posições em simultâneo", "1 (capital todo)"],
+    ["Alavancagem", "margem DEGIRO"],
+    ["Entrada", "pouco antes dos resultados"],
+    ["Stop de perda", "−10%"],
+    ["Saída", "ao recuperar o preço (ou stop)"],
+    ["Lucro", "retirado ao fim do mês"],
   ];
   return (
     <section id="site-metodo" className="ts-sec">
       <h2>O método</h2>
-      <p className="ts-lead">Gestão de capital simples e disciplinada. <b>Importante:</b> é trading ativo de alto risco, não “renda passiva” garantida. O capital pode descer. Isto é opinião/educação, não recomendação.</p>
+      <p className="ts-lead">Gestão de capital simples e disciplinada. <b>Importante:</b> é trading ativo de <b>alto risco</b>, não “renda passiva” garantida. Uso <b>margem</b> e <b>concentro tudo numa ação</b> — posso perder muito depressa. Isto é opinião/educação, <b>não recomendação nem aconselhamento financeiro</b>.</p>
       <div className="ts-steps">
         {steps.map((s) => (
           <div className="ts-step" key={s.n}><div className="ts-stepn">{s.n}</div><div><b>{s.t}</b><p>{s.d}</p></div></div>
         ))}
+      </div>
+
+      {/* linha temporal do trade */}
+      <div className="ts-tl">
+        <div className="ts-tlstep"><span className="ts-tlnum">1</span><b>Comprar</b><small>pouco antes dos resultados (com margem)</small></div>
+        <div className="ts-tlarr">→</div>
+        <div className="ts-tlstep"><span className="ts-tlnum">2</span><b>Resultados</b><small>a empresa reporta</small></div>
+        <div className="ts-tlarr">→</div>
+        <div className="ts-tlstep ts-tlsplit">
+          <div className="ts-tlup"><b>Subiu → vender</b><small>realiza o ganho</small></div>
+          <div className="ts-tldown"><b>Caiu → esperar</b><small>recuperar o preço · corta a −10%</small></div>
+        </div>
+        <div className="ts-tlarr">→</div>
+        <div className="ts-tlstep"><span className="ts-tlnum">3</span><b>Retirar lucro</b><small>ao fim do mês · repõe base</small></div>
+      </div>
+
+      <div className="ts-metgrid">
+        <div className="ts-regras">
+          <h3>Regras concretas</h3>
+          <table><tbody>{regras.map(([k, v]) => <tr key={k}><td>{k}</td><td>{v}</td></tr>)}</tbody></table>
+        </div>
+        {ex && (
+          <div className="ts-exemplo">
+            <h3>Exemplo real</h3>
+            <div className="ts-extic"><Mono ticker={ex.ticker} sector="cyber" /> <b>{ex.ticker}</b> · {ex.name}</div>
+            <ul>
+              <li>Comprou <b>{ex.qty}</b> @ <b>${ex.buyPx}</b> ({eur(ex.cost)}, com margem)</li>
+              <li>Nos resultados <b>subiu</b> → vendeu @ <b>${ex.sellPx}</b></li>
+              <li>Resultado <b style={{ color: "#2FA37A" }}>+{eur(ex.pl)} ({ex.pct >= 0 ? "+" : ""}{ex.pct}%)</b> em <b>{ex.holdDays} {ex.holdDays === 1 ? "dia" : "dias"}</b></li>
+            </ul>
+            <div className="ts-exnote">Exemplo de um trade que correu bem. Há trades que correm mal (ver <a href="#site-hist">Histórico</a>) — GOOG fez −7,7%.</div>
+          </div>
+        )}
+      </div>
+
+      {led && led.n > 0 && (
+        <div className="ts-metstats">
+          <span>Do meu histórico real ({led.n} trades):</span>
+          <b>{led.winRate}% acerto</b> · <b>hold {led.avgHold}d</b> · <b>{led.avgPct >= 0 ? "+" : ""}{led.avgPct}%/trade</b>
+          {led.best && <> · melhor <b style={{ color: "#2FA37A" }}>+{led.best.pct}%</b></>}
+          {led.worst && <> · pior <b style={{ color: "#C8553D" }}>{led.worst.pct}%</b></>}
+        </div>
+      )}
+
+      <div className="ts-metwarn">
+        <b>⚠ Risco elevado e assumido.</b> Uso <b>margem</b> (posso perder mais do que o capital investido) e <b>concentro tudo numa única ação</b>. A direção de uma ação nos resultados é quase uma <b>moeda ao ar</b> — não há edge provado e a variância é alta. Um único mau trade apaga vários bons. Podes perder todo o capital. Isto é <b>opinião/educação</b>, não recomendação nem aconselhamento financeiro. Faz a tua própria análise.
       </div>
     </section>
   );
@@ -533,6 +637,7 @@ export default function TraderSite() {
         <nav>
           <a href="#site" onClick={() => window.scrollTo({ top: 0 })}>Início</a>
           <a href="#site-metodo">Método</a>
+          <a href="#site-edu">Aprende</a>
           <a href="#site-prev">Previsões</a>
           <a href="#site-pos">Posições</a>
           <a href="#site-hist">Histórico</a>
@@ -582,7 +687,9 @@ export default function TraderSite() {
 
       <Positions />
 
-      <Metodo />
+      <Metodo ledger={ledger} />
+
+      <Educacao />
 
       <section id="site-prev" className="ts-sec">
         <h2>Previsões desta semana</h2>
@@ -817,4 +924,38 @@ export const CSS = `
 .ts-tpfoot{margin-top:14px;padding-top:12px;border-top:1px solid var(--line);color:var(--gold);font-size:13px;font-weight:600;}
 .ts-tpnote{color:var(--mut);font-weight:400;font-size:11.5px;}
 @media(max-width:620px){.ts-tpchart{width:100%;}}
+/* método: timeline + regras + exemplo + stats + aviso */
+.ts-tl{display:flex;align-items:stretch;gap:8px;margin:22px 0;flex-wrap:wrap;}
+.ts-tlstep{flex:1;min-width:130px;background:var(--s1);border:1px solid var(--line);border-radius:10px;padding:12px 14px;display:flex;flex-direction:column;gap:3px;}
+.ts-tlstep b{font-size:14px;}.ts-tlstep small{color:var(--mut);font-size:11.5px;line-height:1.4;}
+.ts-tlnum{width:22px;height:22px;border-radius:50%;background:var(--gold);color:#1a1206;font-weight:700;font-size:12px;display:flex;align-items:center;justify-content:center;margin-bottom:2px;}
+.ts-tlarr{display:flex;align-items:center;color:var(--gold);font-size:20px;}
+.ts-tlsplit{gap:8px;padding:8px;}
+.ts-tlup,.ts-tldown{border-radius:8px;padding:7px 9px;}
+.ts-tlup{background:rgba(47,163,122,.12);border:1px solid rgba(47,163,122,.4);}
+.ts-tldown{background:rgba(200,85,61,.12);border:1px solid rgba(200,85,61,.4);}
+.ts-tlup b,.ts-tldown b{font-size:12.5px;}.ts-tlup small,.ts-tldown small{font-size:10.5px;}
+.ts-metgrid{display:grid;grid-template-columns:1fr 1.3fr;gap:16px;margin:6px 0 18px;}
+@media(max-width:640px){.ts-metgrid{grid-template-columns:1fr;}.ts-tlarr{display:none;}}
+.ts-regras,.ts-exemplo{background:var(--s1);border:1px solid var(--line);border-radius:12px;padding:16px 18px;}
+.ts-regras h3,.ts-exemplo h3{font-family:'Space Grotesk',sans-serif;font-size:16px;margin:0 0 10px;}
+.ts-regras table{width:100%;border-collapse:collapse;font-size:13px;}
+.ts-regras td{padding:6px 0;border-bottom:1px solid var(--line);}
+.ts-regras td:first-child{color:var(--mut);}
+.ts-regras td:last-child{text-align:right;font-family:'IBM Plex Mono',monospace;color:var(--tx);}
+.ts-extic{display:flex;align-items:center;gap:8px;font-size:13.5px;margin-bottom:10px;}
+.ts-exemplo ul{list-style:none;padding:0;margin:0 0 10px;}
+.ts-exemplo li{font-size:13.5px;padding:4px 0;border-bottom:1px solid var(--line);color:var(--tx);}
+.ts-exnote{font-size:11.5px;color:var(--mut);line-height:1.5;}.ts-exnote a{color:var(--gold);}
+.ts-metstats{background:rgba(214,164,69,.06);border:1px solid var(--line);border-radius:10px;padding:11px 14px;font-size:13px;color:var(--mut);margin-bottom:16px;}
+.ts-metstats b{font-family:'IBM Plex Mono',monospace;color:var(--tx);}
+.ts-metwarn{background:rgba(200,85,61,.10);border:1px solid var(--red);border-radius:12px;padding:14px 16px;font-size:13px;line-height:1.6;color:#f0d0c8;}
+.ts-metwarn b{color:#fff;}
+/* educação (acordeão) */
+.ts-edu{display:flex;flex-direction:column;gap:8px;}
+.ts-eduitem{background:var(--s1);border:1px solid var(--line);border-radius:10px;overflow:hidden;}
+.ts-eduitem.open{border-color:var(--gold);}
+.ts-eduq{width:100%;text-align:left;background:transparent;border:none;color:var(--tx);font-size:15px;font-weight:600;padding:14px 16px;cursor:pointer;display:flex;align-items:center;gap:8px;font-family:'Inter',sans-serif;}
+.ts-eduq:hover{color:var(--gold);}
+.ts-edua{padding:0 16px 15px 38px;color:var(--mut);font-size:14px;line-height:1.65;}
 `;
