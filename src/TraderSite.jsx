@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import { fetchPublished, fetchPositions, fetchPrices, daysBetween, subscribeEmail, fetchHistory, fetchSettings, fetchLedger, fetchTape } from "./picks.js";
-import { WD, exchOf, fmtDay, fmtName, featuredList, FEATURED_MAX } from "./shared.js";
+import { WD, exchOf, fmtDay, fmtName, featuredList, FEATURED_MAX, THEME_LABELS, themeColor } from "./shared.js";
 
 export const eur = (n) => (n < 0 ? "−" : "") + "€" + Math.abs(Math.round(n)).toLocaleString("pt-PT");
 const CUR_SYM = { USD: "$", EUR: "€", GBP: "£", JPY: "¥", CHF: "CHF ", CAD: "C$", AUD: "A$", HKD: "HK$", SGD: "S$", NOK: "kr ", DKK: "kr ", SEK: "kr ", PLN: "zł " };
@@ -98,7 +98,12 @@ function TickerTape({ items }) {
 }
 
 const RESEARCH_LABELS = { financial: "Análise financeira", equity: "Análise de ações", earnings: "Revisão de resultados", market: "Análise de mercado" };
-const THEME_LABELS = { ai: "IA & Software", cloud: "Cloud", cyber: "Cibersegurança", semis: "Semicondutores", memory: "Memória", datacenter: "Data centers", networking: "Redes", storage: "Armazenamento", finance: "Finanças", crypto: "Cripto", health: "Saúde", consumer: "Consumo", powergrid: "Energia", industrial: "Industrial", defense: "Defesa & Espaço", ev: "Veículos elétricos", solar: "Solar", minerals: "Minerais", gaming: "Media & Gaming" };
+// Tag de área/tema com ponto colorido (cor da legenda).
+function ThemeTag({ sector }) {
+  const label = THEME_LABELS[sector];
+  if (!label) return null;
+  return <span className="ts-themetag"><span className="ts-themedot" style={{ background: themeColor(sector) }} />{label}</span>;
+}
 // mini-barra -1..+1 (sinais) ou centrada em 0 (reações %)
 function SigBar({ v, max = 1 }) {
   const pct = Math.max(-1, Math.min(1, v / max));
@@ -175,7 +180,7 @@ function TraderPick({ pick, onDetail }) {
 
         <div className="ts-tpbody">
           <div className="ts-tpleft">
-            <div className="ts-tptop"><CompanyLogo ticker={p.ticker} sector={p.sector} website={p.website} /><div><div className="ts-tptic">{p.ticker} <span className="ts-aitag">IA</span>{p.sector && THEME_LABELS[p.sector] && <span className="ts-themetag">{THEME_LABELS[p.sector]}</span>}</div><div className="ts-tpname">{fmtName(p.name)}{p.isin && <span className="ts-isin"> · ISIN {p.isin}</span>}</div></div></div>
+            <div className="ts-tptop"><CompanyLogo ticker={p.ticker} sector={p.sector} website={p.website} /><div><div className="ts-tptic">{p.ticker} <span className="ts-aitag">IA</span><ThemeTag sector={p.sector} /></div><div className="ts-tpname">{fmtName(p.name)}{p.isin && <span className="ts-isin"> · ISIN {p.isin}</span>}</div></div></div>
             {p.nota && <div className="ts-tpnota">“{p.nota}”</div>}
           </div>
           {p.history && p.history.length > 1 && <div className="ts-tpchart"><Spark hist={p.history} marks={p.earningsMarks} /></div>}
@@ -289,7 +294,7 @@ export function Featured({ picks, suspenso, onDetail }) {
             onClick={() => onDetail && onDetail(p)}
             title={"Clica para ver o detalhe de " + p.ticker}>
             <div className="ts-feathd"><span className="ts-fttic"><CompanyLogo ticker={p.ticker} sector={p.sector} website={p.website} /> {p.ticker} <span className="ts-aitag" title="Análise assistida por IA">IA</span></span>{suspenso ? <span className="ts-ftbadge" style={{ background: "#8CA3B3" }}>SUSPENSO</span> : p.probUp != null ? <span className="ts-ftbadge" style={{ background: probColor(p.probUp) }}>↑ {p.probUp}%</span> : null}</div>
-            <div className="ts-ftname">{fmtName(p.name)}{p.sector && THEME_LABELS[p.sector] && <span className="ts-themetag">{THEME_LABELS[p.sector]}</span>}</div>
+            <div className="ts-ftname">{fmtName(p.name)}<ThemeTag sector={p.sector} /></div>
             <div className="ts-ftmeta">{p.exch || "EUA"}{p.entryISO ? " · entrar " + fmtDay(p.entryISO) : ""}</div>
             {hasA && !suspenso && (
               <>
@@ -370,7 +375,7 @@ function Predictions({ picks, suspenso, onDetail }) {
                 title={"Clica para ver o detalhe de " + it.ticker}>
                 <span className="ts-ptic">{it.ticker}</span>
                 <span className="ts-pex">{exchOf(it.ticker)}</span>
-                <span className="ts-pnamewrap"><span className="ts-pname">{fmtName(it.name)}</span>{it.sector && THEME_LABELS[it.sector] && <span className="ts-themetag">{THEME_LABELS[it.sector]}</span>}</span>
+                <span className="ts-pnamewrap"><span className="ts-pname">{fmtName(it.name)}</span><ThemeTag sector={it.sector} /></span>
                 <span className="ts-pwhen">{it.when === "BMO" ? "pré-abertura" : it.when === "AMC" ? "após fecho" : ""}</span>
                 {!suspenso && picks[it.ticker]?.show && (() => {
                   const p2 = picks[it.ticker];
@@ -608,7 +613,7 @@ function HistoricoCalendario({ ledger }) {
                     {canExpand && <span className={"ts-caret" + (isOpen ? " open" : "")}>▸</span>}
                     <span className="ts-ptic">{r.ticker}</span>
                     <span className="ts-pex">{r.exch || "EUA"}</span>
-                    <span className="ts-pnamewrap"><span className="ts-pname">{fmtName(r.name)}</span>{r.sector && THEME_LABELS[r.sector] && <span className="ts-themetag">{THEME_LABELS[r.sector]}</span>}</span>
+                    <span className="ts-pnamewrap"><span className="ts-pname">{fmtName(r.name)}</span><ThemeTag sector={r.sector} /></span>
                     {r.pct != null && <span style={{ color: r.pct < 0 ? "#C8553D" : "#2FA37A", fontFamily: "'IBM Plex Mono',monospace" }}>{r.pct >= 0 ? "▲ +" : "▼ "}{r.pct}%</span>}
                     {r.pnl != null && <span style={{ color: r.pnl < 0 ? "#C8553D" : "#2FA37A", fontFamily: "'IBM Plex Mono',monospace" }}>{r.pnl >= 0 ? "+€" : "−€"}{Math.abs(r.pnl)}</span>}
                     {r.aposta && r.predicted && r.predicted !== "NEUTRO" && (() => { const hit = (r.predicted === "SUBIR" && r.pct > 0) || (r.predicted === "DESCER" && r.pct < 0); return <span className="ts-predtag" title="Previsão dada nas previsões vs resultado real" style={{ color: hit ? "#2FA37A" : "#C8553D" }}>previu {r.predicted === "SUBIR" ? "↑" : "↓"} {hit ? "✓" : "✕"}</span>; })()}
@@ -1064,7 +1069,8 @@ export const CSS = `
 .ts-modalfoot{margin-top:14px;padding-top:12px;border-top:1px solid var(--line);font-size:13px;}
 .ts-modalfoot a{color:var(--gold);text-decoration:none;font-weight:600;}
 /* card: tema + sinais + reações */
-.ts-themetag{font-size:10.5px;background:var(--s2);border:1px solid var(--line);border-radius:20px;padding:2px 9px;color:var(--mut);margin-left:8px;vertical-align:middle;}
+.ts-themetag{font-size:10.5px;background:var(--s2);border:1px solid var(--line);border-radius:20px;padding:2px 9px;color:var(--mut);margin-left:8px;vertical-align:middle;white-space:nowrap;}
+.ts-themedot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;vertical-align:middle;}
 .ts-tpsig{margin-top:14px;padding-top:12px;border-top:1px solid var(--line);}
 .ts-tpsighint{font-size:12px;color:#f0d9a8;background:rgba(214,164,69,.08);border:1px solid var(--line);border-radius:8px;padding:8px 11px;margin-bottom:10px;line-height:1.5;}
 .ts-tpsiggrid{display:grid;grid-template-columns:1fr 1fr;gap:8px 22px;}

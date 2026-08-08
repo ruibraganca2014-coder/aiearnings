@@ -32,4 +32,8 @@ export const featuredList = (picks, max = FEATURED_MAX) =>
     .filter((p) => p && p.featured && p.show)
     .sort((a, b) => (a.entryISO || a.date || "").localeCompare(b.entryISO || b.date || ""))
     .slice(0, max);
+// Áreas/temas: rótulo + cor (as cores batem certo com a legenda do painel de análise).
+export const THEME_LABELS = { ai: "IA & Software", cloud: "Cloud", cyber: "Cibersegurança", semis: "Semicondutores", memory: "Memória", datacenter: "Data centers", networking: "Redes", storage: "Armazenamento", finance: "Finanças", crypto: "Cripto", health: "Saúde", consumer: "Consumo", powergrid: "Energia", industrial: "Industrial", defense: "Defesa & Espaço", ev: "Veículos elétricos", solar: "Solar", minerals: "Minerais", gaming: "Media & Gaming" };
+export const THEME_COLORS = { ai: "#7C9CF0", cloud: "#6E7BC0", cyber: "#4FB0D4", semis: "#2FB6A0", memory: "#D2A05A", datacenter: "#5C8FB8", networking: "#9E7AD0", storage: "#8FA0D0", finance: "#8FA8B8", crypto: "#E0B341", health: "#E0708F", consumer: "#D98AC0", powergrid: "#E08A4A", industrial: "#9DAE5E", defense: "#C77B4A", ev: "#4FC987", solar: "#F0A93A", minerals: "#B58A5E", gaming: "#C77FD8" };
+export const themeColor = (s) => THEME_COLORS[s] || "#8CA3B3";
 export const fmtDay = (iso) => { const d = new Date(iso + "T00:00:00"); return isNaN(d) ? iso : String(d.getDate()).padStart(2, "0") + "/" + String(d.getMonth() + 1).padStart(2, "0"); };
