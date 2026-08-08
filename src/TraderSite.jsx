@@ -585,7 +585,7 @@ function HistoricoCalendario({ ledger }) {
                     {canExpand && <span className={"ts-caret" + (isOpen ? " open" : "")}>▸</span>}
                     <span className="ts-ptic">{r.ticker}</span>
                     <span className="ts-pex">{r.exch || "EUA"}</span>
-                    <span className="ts-pname">{r.name}</span>
+                    <span className="ts-pname">{fmtName(r.name)}</span>
                     {r.pct != null && <span style={{ color: r.pct < 0 ? "#C8553D" : "#2FA37A", fontFamily: "'IBM Plex Mono',monospace" }}>{r.pct >= 0 ? "▲ +" : "▼ "}{r.pct}%</span>}
                     {r.pnl != null && <span style={{ color: r.pnl < 0 ? "#C8553D" : "#2FA37A", fontFamily: "'IBM Plex Mono',monospace" }}>{r.pnl >= 0 ? "+€" : "−€"}{Math.abs(r.pnl)}</span>}
                     {r.aposta && r.predicted && r.predicted !== "NEUTRO" && (() => { const hit = (r.predicted === "SUBIR" && r.pct > 0) || (r.predicted === "DESCER" && r.pct < 0); return <span className="ts-predtag" title="Previsão dada nas previsões vs resultado real" style={{ color: hit ? "#2FA37A" : "#C8553D" }}>previu {r.predicted === "SUBIR" ? "↑" : "↓"} {hit ? "✓" : "✕"}</span>; })()}

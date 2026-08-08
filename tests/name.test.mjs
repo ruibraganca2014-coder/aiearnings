@@ -28,6 +28,11 @@ describe("fmtName", () => {
     expect(fmtName("CWLTH BANK FPO [CBA]")).toBe("Cwlth Bank FPO [CBA]");
   });
 
+  it("capitaliza sufixo INC mas mantém sigla RWE", () => {
+    expect(fmtName("CLOUDFLARE INC CLASS A")).toBe("Cloudflare Inc Class A");
+    expect(fmtName("GILEAD SCIENCES, INC")).toBe("Gilead Sciences, Inc");
+  });
+
   it("preserva tokens com dígitos", () => {
     expect(fmtName("RWE AG I")).toBe("RWE AG I");
   });
