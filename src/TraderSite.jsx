@@ -331,7 +331,7 @@ function Predictions({ picks, suspenso, onDetail }) {
       .then((a) => setRows((a || []).filter((x) => !x.past)))
       .catch((e) => setErr(String(e.message || e)));
   }, []);
-  const DAYS_SHOWN = 7; // 7 dias úteis seguidos a partir do 1º dia com resultados (inclui sexta, mesmo sem resultados)
+  const DAYS_SHOWN = 5; // 1 semana útil (Seg–Sex) a partir do 1º dia com resultados
   const groups = useMemo(() => {
     if (!rows) return [];
     const g = {};
