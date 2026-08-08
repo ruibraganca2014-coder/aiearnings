@@ -90,18 +90,31 @@ const UNIVERSE = {
   SPCX:"defense",SPCE:"defense",RKLB:"defense",LUNR:"defense",
   // Euronext Lisboa (.LS)
   "GALP.LS":"powergrid","EDP.LS":"powergrid","EDPR.LS":"solar","JMT.LS":"consumer","BCP.LS":"finance","NOS.LS":"consumer","SON.LS":"consumer","CTT.LS":"industrial","ALTR.LS":"ai","SEM.LS":"minerals",
+  "NVG.LS":"minerals","COR.LS":"consumer","RENE.LS":"powergrid","IBS.LS":"consumer","EGL.LS":"industrial",
   // Londres (.L)
   "SHEL.L":"powergrid","BP.L":"powergrid","AZN.L":"health","GSK.L":"health","HSBA.L":"finance","ULVR.L":"consumer","RIO.L":"minerals","BATS.L":"consumer","DGE.L":"consumer","BARC.L":"finance","LSEG.L":"finance","VOD.L":"ai",
+  "GLEN.L":"minerals","REL.L":"ai","NG.L":"powergrid","PRU.L":"finance","LLOY.L":"finance","BA.L":"defense","AAL.L":"minerals","TSCO.L":"consumer","STAN.L":"finance","IMB.L":"consumer","RR.L":"defense","NWG.L":"finance",
   // Paris (.PA)
   "MC.PA":"consumer","OR.PA":"consumer","TTE.PA":"powergrid","SAN.PA":"health","AIR.PA":"defense","BNP.PA":"finance","SU.PA":"industrial","AI.PA":"minerals","DG.PA":"industrial","RMS.PA":"consumer",
+  "EL.PA":"health","CAP.PA":"ai","SGO.PA":"industrial","KER.PA":"consumer","CS.PA":"finance","ACA.PA":"finance","ENGI.PA":"powergrid","VIE.PA":"powergrid","ORA.PA":"ai","PUB.PA":"consumer","STLAP.PA":"ev","EN.PA":"industrial",
   // Amsterdão (.AS)
   "ASML.AS":"semis","PRX.AS":"ai","INGA.AS":"finance","AD.AS":"consumer","PHIA.AS":"health","HEIA.AS":"consumer","ADYEN.AS":"finance",
+  "ASM.AS":"semis","WKL.AS":"ai","BESI.AS":"semis","RAND.AS":"industrial","AKZA.AS":"minerals","MT.AS":"minerals","NN.AS":"finance","KPN.AS":"ai",
   // Xetra / Alemanha (.DE)
   "SAP.DE":"cloud","SIE.DE":"industrial","ALV.DE":"finance","DTE.DE":"ai","MBG.DE":"ev","BAS.DE":"minerals","BMW.DE":"ev","VOW3.DE":"ev","IFX.DE":"semis","MRK.DE":"health",
+  "DBK.DE":"finance","ADS.DE":"consumer","DHL.DE":"industrial","RWE.DE":"powergrid","EOAN.DE":"powergrid","DB1.DE":"finance","MUV2.DE":"finance","HEN3.DE":"consumer","BAYN.DE":"health","CON.DE":"ev","VNA.DE":"finance","P911.DE":"ev",
   // Milão (.MI)
   "RACE.MI":"consumer","ENEL.MI":"powergrid","ISP.MI":"finance","UCG.MI":"finance","ENI.MI":"powergrid","STLAM.MI":"ev","G.MI":"finance","PIRC.MI":"ev",
+  "STMMI.MI":"semis","MONC.MI":"consumer","TIT.MI":"ai","BAMI.MI":"finance","MB.MI":"finance","PST.MI":"finance","LDO.MI":"defense",
   // Madrid (.MC)
   "SAN.MC":"finance","BBVA.MC":"finance","IBE.MC":"powergrid","ITX.MC":"consumer","TEF.MC":"ai","REP.MC":"powergrid","AENA.MC":"industrial","CLNX.MC":"networking","FER.MC":"industrial",
+  "AMS.MC":"ai","CABK.MC":"finance","ELE.MC":"powergrid","NTGY.MC":"powergrid","MAP.MC":"finance",
+  // Suíça (.SW)
+  "NESN.SW":"consumer","NOVN.SW":"health","ROG.SW":"health","UBSG.SW":"finance","ZURN.SW":"finance","ABBN.SW":"industrial","CFR.SW":"consumer","LONN.SW":"health","SIKA.SW":"minerals","GIVN.SW":"minerals",
+  // Bruxelas (.BR)
+  "ABI.BR":"consumer","KBC.BR":"finance","UCB.BR":"health","SOLB.BR":"minerals","GBLB.BR":"finance",
+  // Dublin (.IR) · Estocolmo (.ST)
+  "RYA.IR":"consumer","KRZ.IR":"ai","ERIC-B.ST":"networking","INVE-B.ST":"finance",
 };
 
 // mapeia setor Yahoo → tema visual da app (para o ponto colorido)
@@ -143,6 +156,10 @@ const EXCHANGES = {
   HK: { tz: "Asia/Hong_Kong", open: 570, close: 960, label: "Hong Kong" },
   MI: { tz: "Europe/Rome", open: 540, close: 1050, label: "Milão" },       // 09:00-17:30
   MC: { tz: "Europe/Madrid", open: 540, close: 1050, label: "Madrid" },    // 09:00-17:30
+  SW: { tz: "Europe/Zurich", open: 540, close: 1050, label: "Zurique" },   // SIX 09:00-17:30
+  BR: { tz: "Europe/Brussels", open: 540, close: 1050, label: "Bruxelas" },// 09:00-17:30
+  IR: { tz: "Europe/Dublin", open: 480, close: 990, label: "Dublin" },     // 08:00-16:30
+  ST: { tz: "Europe/Stockholm", open: 540, close: 1050, label: "Estocolmo" },// 09:00-17:30
   TO: { tz: "America/Toronto", open: 570, close: 960, label: "Toronto" },  // 09:30-16:00
   SA: { tz: "America/Sao_Paulo", open: 600, close: 1020, label: "Brasil" },// 10:00-17:00
   NS: { tz: "Asia/Kolkata", open: 555, close: 930, label: "Índia" },       // 09:15-15:30
@@ -574,9 +591,8 @@ async function _realCalendar(fromISO, toISO) {
   } catch { /* sem passados */ }
 
   // passados primeiro (mais recente → mais antigo), depois próximos (crescente); o frontend separa.
-  // só ações dos EUA: descarta tickers com sufixo de bolsa estrangeira (.AS, .DE, .MI, .PA, .L, .LS, .MC…).
-  const usOnly = (x) => !/\.[A-Z]+$/.test(String(x.ticker || ""));
-  return [...past, ...upcoming.sort((a, b) => a.date.localeCompare(b.date))].filter(usOnly);
+  // inclui EUA + mercados europeus da DEGIRO (watchlist UNIVERSE, com fuso/hora por bolsa).
+  return [...past, ...upcoming.sort((a, b) => a.date.localeCompare(b.date))];
 }
 
 // exports cacheados: quote 2 min, calendário 5 min (dedupe + poupa chamadas Yahoo)

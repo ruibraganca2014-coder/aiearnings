@@ -30,12 +30,12 @@ describe("Featured", () => {
     EU: { ticker: "MC.PA", name: "LVMH", show: true, probUp: 70 }, // estrangeiro → filtrado
     HID: { ticker: "BBB", name: "Beta", show: false, probUp: 55 }, // não publicado
   };
-  it("mostra só EUA publicados, com probabilidade", () => {
+  it("mostra publicados (todos os mercados), com probabilidade", () => {
     render(<Featured picks={picks} suspenso={false} />);
     expect(screen.getAllByText("AAA").length).toBeGreaterThan(0);
     expect(screen.getByText("60%")).toBeTruthy();
-    expect(screen.queryByText("MC.PA")).toBeNull(); // estrangeiro fora
-    expect(screen.queryByText("BBB")).toBeNull();    // show:false fora
+    expect(screen.getAllByText("MC.PA").length).toBeGreaterThan(0); // europeu agora aparece
+    expect(screen.queryByText("BBB")).toBeNull();                    // show:false continua fora
   });
   it("clique chama onDetail", () => {
     const onDetail = vi.fn();

@@ -329,8 +329,8 @@ async function fetchCalendar(fromISO, toISO) {
   const arr = await res.json();
   if (!res.ok || arr.error) throw new Error(arr.error || `erro ${res.status}`);
   if (!Array.isArray(arr)) throw new Error("resposta inválida");
-  // só EUA (descarta sufixo de bolsa estrangeira) + próximos na janela / passados verificados
-  return arr.filter((x) => !/\.[A-Z]+$/.test(String(x.ticker || "")) && (x.past || (x.date >= fromISO && x.date <= toISO)));
+  // todos os mercados (EUA + Europa DEGIRO) + próximos na janela / passados verificados
+  return arr.filter((x) => x.past || (x.date >= fromISO && x.date <= toISO));
 }
 
 const RESEARCH_META = {

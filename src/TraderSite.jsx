@@ -132,7 +132,6 @@ export function StockModal({ pick, onClose }) {
       <div className="ts-modalbox" onClick={(e) => e.stopPropagation()}>
         <button className="ts-modalx" onClick={onClose}>✕</button>
         <div className="ts-modalhd"><CompanyLogo ticker={p.ticker} sector={p.sector} website={p.website} /><div><div className="ts-tptic">{p.ticker} <span className="ts-aitag">IA</span></div><div className="ts-tpname">{p.name}{p.isin && <span className="ts-isin"> · ISIN {p.isin}</span>}</div></div>{p.probUp != null && <span className="ts-ftbadge" style={{ background: probColor(p.probUp), marginLeft: "auto" }}>↑ {p.probUp}%</span>}</div>
-        {p.nota && <div className="ts-tpnota">“{p.nota}”</div>}
         {p.history && p.history.length > 1 && <div className="ts-tpchart" style={{ width: "100%", margin: "12px 0" }}><Spark hist={p.history} marks={p.earningsMarks} /></div>}
         <div className="ts-mmetrics">
           <M l="Probabilidade de subir" v={p.probUp != null ? p.probUp + "%" : null} c={probColor(p.probUp)} />
@@ -277,7 +276,7 @@ function CookieBanner() {
 }
 
 export function Featured({ picks, suspenso, onDetail }) {
-  const list = Object.values(picks || {}).filter((p) => p.show && exchOf(p.ticker) === "EUA")
+  const list = Object.values(picks || {}).filter((p) => p.show)
     .sort((a, b) => (a.entryISO || a.date || "").localeCompare(b.entryISO || b.date || ""))
     .slice(0, 8); // as próximas 8 publicadas (EUA, por data)
   if (!list.length) return null;
@@ -327,9 +326,9 @@ function Predictions({ picks, suspenso, onDetail }) {
   }, []);
   const groups = useMemo(() => {
     if (!rows) return [];
-    const us = rows.filter((it) => exchOf(it.ticker) === "EUA")
+    const us = [...rows]
       .sort((a, b) => (a.entryISO || a.date || "").localeCompare(b.entryISO || b.date || ""))
-      .slice(0, 8); // as próximas 8 previsões (EUA)
+      .slice(0, 8); // as próximas 8 previsões (todos os mercados)
     const g = {};
     for (const it of us) { const k = it.entryISO || it.date; (g[k] = g[k] || []).push(it); }
     return Object.keys(g).sort().map((k) => ({ day: k, items: g[k] }));
@@ -550,7 +549,7 @@ function HistoricoCalendario({ ledger }) {
   const days = useMemo(() => {
     const apostados = (rows || []).map((r) => ({ ...r, aposta: true }));
     const apSet = new Set(apostados.map((r) => r.ticker));
-    const naoAp = mkt.filter((x) => !apSet.has(x.ticker) && exchOf(x.ticker) === "EUA").map((x) => ({ ticker: x.ticker, name: x.name, date: x.date, pct: Math.round(x.reaction * 10) / 10, exch: exchOf(x.ticker), aposta: false }));
+    const naoAp = mkt.filter((x) => !apSet.has(x.ticker)).map((x) => ({ ticker: x.ticker, name: x.name, date: x.date, pct: Math.round(x.reaction * 10) / 10, exch: exchOf(x.ticker), aposta: false }));
     const g = {};
     [...apostados, ...naoAp].filter((r) => r.date && daysBetween(r.date) <= 7).forEach((r) => { (g[r.date] = g[r.date] || []).push(r); }); // só últimos 7 dias
     return Object.keys(g).sort((a, b) => b.localeCompare(a)).map((d) => ({ day: d, items: g[d].sort((a, b) => (b.aposta ? 1 : 0) - (a.aposta ? 1 : 0)) }));
@@ -641,7 +640,7 @@ export default function TraderSite() {
     const idx = ["^GSPC", "^IXIC", "^DJI", "EURUSD=X"];
     const mine = new Set();
     (ledger.trades || []).forEach((t) => t.ticker && mine.add(t.ticker));
-    Object.values(picks || {}).forEach((p) => p.ticker && exchOf(p.ticker) === "EUA" && mine.add(p.ticker));
+    Object.values(picks || {}).forEach((p) => p.ticker && p.show && mine.add(p.ticker));
     hist.forEach((r) => r.ticker && mine.add(r.ticker));
     return [...idx, ...[...mine].slice(0, 16)];
   }, [ledger, picks, hist]);
@@ -876,6 +875,10 @@ export const CSS = `
 /* grelha compacta dos cards das Previsões */
 .ts-ftspark{margin:8px 0;}
 .ts-ftgrid{margin-top:10px;border-top:1px solid var(--line);padding-top:10px;display:grid;grid-template-columns:1fr 1fr;gap:9px 12px;}
+.ts-feat .ts-ftgrid{border-top:none;padding-top:0;grid-template-columns:1fr 22px 1fr;}
+.ts-feat .ts-ftgrid .ts-ftcell:nth-child(odd){grid-column:1;}
+.ts-feat .ts-ftgrid .ts-ftcell:nth-child(even){grid-column:3;text-align:right;align-items:flex-end;}
+.ts-feat .ts-ftgrid .ts-ftcell:nth-child(even) .ts-fill{width:100%;}
 .ts-ftcell{display:flex;flex-direction:column;gap:2px;min-width:0;}
 .ts-ftcl{font-size:10.5px;color:var(--mut);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .ts-ftcell b{font-family:'IBM Plex Mono',monospace;font-size:14px;color:var(--tx);}
