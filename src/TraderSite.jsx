@@ -883,7 +883,7 @@ export const CSS = `
 .ts-dayhdr{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:15px;margin-bottom:10px;text-transform:capitalize;}.ts-dayhdr span{float:right;font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--mut);font-weight:400;text-transform:none;}
 .ts-prow{display:flex;align-items:center;gap:10px;padding:8px 0;border-top:1px solid var(--line);font-size:13.5px;flex-wrap:wrap;}
 .ts-ptic{font-family:'Space Grotesk',sans-serif;font-weight:700;min-width:66px;}
-.ts-pex{font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--gold);border:1px solid var(--line);border-radius:5px;padding:1px 5px;}
+.ts-pex{font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--gold);border:1px solid var(--line);border-radius:5px;padding:1px 5px;display:inline-block;box-sizing:border-box;min-width:74px;text-align:center;flex-shrink:0;}
 .ts-pname{color:var(--mut);flex:1;min-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .ts-pnamewrap{flex:1;min-width:120px;display:flex;align-items:center;gap:8px;overflow:hidden;}
 .ts-pnamewrap .ts-pname{flex:none;min-width:0;}
