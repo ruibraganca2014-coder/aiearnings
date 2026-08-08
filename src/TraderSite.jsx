@@ -291,7 +291,7 @@ export function Featured({ picks, suspenso, onDetail }) {
             onClick={() => onDetail && onDetail(p)}
             title={"Clica para ver o detalhe de " + p.ticker}>
             <div className="ts-feathd"><span className="ts-fttic"><CompanyLogo ticker={p.ticker} sector={p.sector} website={p.website} /> {p.ticker} <span className="ts-aitag" title="Análise assistida por IA">IA</span></span>{suspenso ? <span className="ts-ftbadge" style={{ background: "#8CA3B3" }}>SUSPENSO</span> : p.probUp != null ? <span className="ts-ftbadge" style={{ background: probColor(p.probUp) }}>↑ {p.probUp}%</span> : null}</div>
-            <div className="ts-ftname">{p.name}{p.sector && p.sector !== "other" && <span className="ts-ftsect">{p.sector}</span>}</div>
+            <div className="ts-ftname">{p.name}{p.sector && THEME_LABELS[p.sector] && <span className="ts-themetag">{THEME_LABELS[p.sector]}</span>}</div>
             <div className="ts-ftmeta">{p.exch || "EUA"}{p.entryISO ? " · entrar " + fmtDay(p.entryISO) : ""}</div>
             {hasA && !suspenso && (
               <>
@@ -354,7 +354,7 @@ function Predictions({ picks, suspenso, onDetail }) {
                 title={"Clica para ver o detalhe de " + it.ticker}>
                 <span className="ts-ptic">{it.ticker}</span>
                 <span className="ts-pex">{exchOf(it.ticker)}</span>
-                <span className="ts-pname">{it.name}</span>
+                <span className="ts-pname">{it.name}</span>{it.sector && THEME_LABELS[it.sector] && <span className="ts-themetag">{THEME_LABELS[it.sector]}</span>}
                 <span className="ts-pwhen">{it.when === "BMO" ? "pré-abertura" : it.when === "AMC" ? "após fecho" : ""}</span>
                 {!suspenso && picks[it.ticker]?.show && (() => { const p2 = picks[it.ticker]; const parts = []; if (p2.confidence != null) parts.push("conf " + p2.confidence + "%"); if (p2.ev != null) parts.push("EV " + (p2.ev >= 0 ? "+" : "") + p2.ev + "%"); if (p2.gapUp != null) parts.push("gap↑ " + p2.gapUp + "%"); if (p2.impliedMove != null) parts.push("±" + p2.impliedMove + "%"); return parts.length ? <span className="ts-pmetrics">{parts.join(" · ")}</span> : null; })()}
                 {suspenso
