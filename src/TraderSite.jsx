@@ -233,7 +233,6 @@ function Featured({ picks, suspenso, onDetail }) {
             title={"Clica: análise · 2× clica: detalhe rápido"}>
             <div className="ts-feathd"><span className="ts-fttic"><Mono ticker={p.ticker} sector={p.sector} /> {p.ticker} <span className="ts-aitag" title="Análise assistida por IA">IA</span></span>{suspenso ? <span className="ts-ftbadge" style={{ background: "#8CA3B3" }}>SUSPENSO</span> : p.probUp != null ? <span className="ts-ftbadge" style={{ background: probColor(p.probUp) }}>↑ {p.probUp}%</span> : null}</div>
             <div className="ts-ftname">{p.name}{p.sector && p.sector !== "other" && <span className="ts-ftsect">{p.sector}</span>}</div>
-            {p.nota && <div className="ts-ftnote">“{p.nota}”</div>}
             <div className="ts-ftmeta">{p.exch || "EUA"}{p.entryISO ? " · entrar " + fmtDay(p.entryISO) : ""}</div>
             {hasA && !suspenso && (
               <div className="ts-ftdet">
@@ -669,7 +668,6 @@ export default function TraderSite() {
                 {led.totalCost != null && <div className="ts-stat"><b style={{ color: "#C8553D" }}>−{eur(led.totalCost)}</b><span>custos totais</span><small>{led.costPerTrade != null ? "≈ €" + led.costPerTrade + "/trade" : "comissões + taxas"}</small></div>}
                 {led.pctStd != null && <div className="ts-stat"><b>±{led.pctStd}%</b><span>consistência</span><small>desvio por trade</small></div>}
                 {led.avgFx != null && <div className="ts-stat"><b>{led.avgFx}</b><span>câmbio EUR/USD</span><small>média nas operações</small></div>}
-                {led.stopCount != null && <div className="ts-stat"><b style={{ color: led.stopCount > 0 ? "#C8553D" : "#2FA37A" }}>{led.stopCount}</b><span>vendas no stop −10%</span><small>regra nova · 0 forçadas até agora</small></div>}
               </div>
             </div>
           )}
