@@ -25,4 +25,11 @@ export function fmtName(s) {
     return tok.toLowerCase().replace(/(^|[\s\-/.])([a-z])/g, (m, p, c) => p + c.toUpperCase());
   }).join("");
 }
+// Escolha(s) do trader: picks marcadas ★ (featured) e publicadas (show), ordenadas por entrada, no máx. `max`.
+export const FEATURED_MAX = 3;
+export const featuredList = (picks, max = FEATURED_MAX) =>
+  Object.values(picks || {})
+    .filter((p) => p && p.featured && p.show)
+    .sort((a, b) => (a.entryISO || a.date || "").localeCompare(b.entryISO || b.date || ""))
+    .slice(0, max);
 export const fmtDay = (iso) => { const d = new Date(iso + "T00:00:00"); return isNaN(d) ? iso : String(d.getDate()).padStart(2, "0") + "/" + String(d.getMonth() + 1).padStart(2, "0"); };

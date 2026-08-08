@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import { fetchPublished, fetchPositions, fetchPrices, daysBetween, subscribeEmail, fetchHistory, fetchSettings, fetchLedger, fetchTape } from "./picks.js";
-import { WD, exchOf, fmtDay, fmtName } from "./shared.js";
+import { WD, exchOf, fmtDay, fmtName, featuredList, FEATURED_MAX } from "./shared.js";
 
 export const eur = (n) => (n < 0 ? "−" : "") + "€" + Math.abs(Math.round(n)).toLocaleString("pt-PT");
 const CUR_SYM = { USD: "$", EUR: "€", GBP: "£", JPY: "¥", CHF: "CHF ", CAD: "C$", AUD: "A$", HKD: "HK$", SGD: "S$", NOK: "kr ", DKK: "kr ", SEK: "kr ", PLN: "zł " };
@@ -164,7 +164,6 @@ function TraderPick({ pick, onDetail }) {
   const stopPx = p.price != null ? (p.price * 0.9).toFixed(0) : null;
   const entryTxt = (p.when === "BMO" ? "pré-abertura" : p.when === "AMC" ? "após fecho" : "") + (p.buyBy ? " · " + p.buyBy : p.entryISO ? " · " + fmtDay(p.entryISO) : "");
   return (
-    <section className="ts-sec ts-tpsec">
       <div className="ts-tpcard" style={{ borderColor: probColor(p.probUp) }} onClick={() => onDetail && onDetail(p)}>
         <div className="ts-tphead">
           <span className="ts-tplabel">★ Escolha do trader</span>
@@ -239,7 +238,6 @@ function TraderPick({ pick, onDetail }) {
         )}
         <div className="ts-tpfoot"><span className="ts-tpnote">Probabilidade/opinião, não recomendação.</span></div>
       </div>
-    </section>
   );
 }
 
@@ -354,7 +352,7 @@ function Predictions({ picks, suspenso, onDetail }) {
                 title={"Clica para ver o detalhe de " + it.ticker}>
                 <span className="ts-ptic">{it.ticker}</span>
                 <span className="ts-pex">{exchOf(it.ticker)}</span>
-                <span className="ts-pname">{fmtName(it.name)}</span>{it.sector && THEME_LABELS[it.sector] && <span className="ts-themetag">{THEME_LABELS[it.sector]}</span>}
+                <span className="ts-pnamewrap"><span className="ts-pname">{fmtName(it.name)}</span>{it.sector && THEME_LABELS[it.sector] && <span className="ts-themetag">{THEME_LABELS[it.sector]}</span>}</span>
                 <span className="ts-pwhen">{it.when === "BMO" ? "pré-abertura" : it.when === "AMC" ? "após fecho" : ""}</span>
                 {!suspenso && picks[it.ticker]?.show && (() => { const p2 = picks[it.ticker]; const parts = []; if (p2.confidence != null) parts.push("conf " + p2.confidence + "%"); if (p2.ev != null) parts.push("EV " + (p2.ev >= 0 ? "+" : "") + p2.ev + "%"); if (p2.gapUp != null) parts.push("gap↑ " + p2.gapUp + "%"); if (p2.impliedMove != null) parts.push("±" + p2.impliedMove + "%"); return parts.length ? <span className="ts-pmetrics">{parts.join(" · ")}</span> : null; })()}
                 {suspenso
@@ -657,7 +655,7 @@ export default function TraderSite() {
     return () => clearInterval(id);
   }, [tapeSyms.join(",")]);
   const led = ledger.stats || null;
-  const featPick = useMemo(() => Object.values(picks || {}).find((p) => p.featured && p.show), [picks]);
+  const featPicks = useMemo(() => featuredList(picks), [picks]);
   const [modalPick, setModalPick] = useState(null);
   const histSum = hist.reduce((a, r) => a + (Number(r.pnl) || 0), 0);
   const totalPL = settings.totalPL != null ? Number(settings.totalPL) : histSum; // Total L/P: da conta DEGIRO (upload) ou soma do histórico
@@ -699,7 +697,13 @@ export default function TraderSite() {
         <div className="ts-herowarn">Conteúdo informativo — indicativo, não prova de edge. Alta variância. Não é aconselhamento financeiro.</div>
       </section>
 
-      <TraderPick pick={featPick} onDetail={setModalPick} />
+      {featPicks.length > 0 && (
+        <section className={"ts-sec ts-tpsec" + (featPicks.length > 1 ? " ts-tpsec--multi" : "")}>
+          <div className={"ts-tpwrap ts-tpwrap--" + featPicks.length}>
+            {featPicks.map((p) => <TraderPick key={p.ticker} pick={p} onDetail={setModalPick} />)}
+          </div>
+        </section>
+      )}
 
       <section className="ts-sec ts-topstats">
         <div className="ts-statwrap">
@@ -850,6 +854,9 @@ export const CSS = `
 .ts-ptic{font-family:'Space Grotesk',sans-serif;font-weight:700;min-width:66px;}
 .ts-pex{font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--gold);border:1px solid var(--line);border-radius:5px;padding:1px 5px;}
 .ts-pname{color:var(--mut);flex:1;min-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.ts-pnamewrap{flex:1;min-width:120px;display:flex;align-items:center;gap:8px;overflow:hidden;}
+.ts-pnamewrap .ts-pname{flex:none;min-width:0;}
+.ts-pnamewrap .ts-themetag{flex-shrink:0;margin-left:0;}
 .ts-pwhen{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--mut);}
 .ts-plock{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--gold);}
 .ts-topstats{border-top:none;padding-top:4px;margin-top:-8px;}
@@ -982,6 +989,14 @@ export const CSS = `
 .ts-pexpline a:hover{text-decoration:underline;}
 /* escolha do trader (destaque) */
 .ts-tpsec{padding-top:8px;padding-bottom:8px;border-top:none;}
+.ts-tpwrap{display:grid;gap:16px;align-items:start;}
+.ts-tpwrap--1{grid-template-columns:1fr;}
+.ts-tpwrap--2{grid-template-columns:repeat(2,minmax(0,1fr));}
+.ts-tpwrap--3{grid-template-columns:repeat(3,minmax(0,1fr));}
+.ts-tpsec--multi .ts-tpcard{padding:14px 15px;}
+.ts-tpsec--multi .ts-tpplan{flex-wrap:wrap;}
+@media(max-width:1000px){.ts-tpwrap--3{grid-template-columns:repeat(2,minmax(0,1fr));}}
+@media(max-width:720px){.ts-tpwrap--2,.ts-tpwrap--3{grid-template-columns:1fr;}}
 .ts-tpcard{background:linear-gradient(180deg,rgba(214,164,69,.07),var(--s1));border:1.5px solid var(--gold);border-radius:16px;padding:18px 20px;cursor:pointer;transition:transform .12s,box-shadow .12s;}
 .ts-tpcard:hover{transform:translateY(-2px);box-shadow:0 10px 30px rgba(0,0,0,.35);}
 .ts-tphead{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;}

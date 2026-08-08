@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useRef } from "react";
 import EarningsEdge from "../EarningsEdge.jsx";
 import { getToken, setToken, clearToken, fetchAll, savePicks, login, fetchPositions, savePositions, fetchPrices, daysBetween, fetchHistory, saveHistory, extractDoc, fetchEmails, fetchSettings, saveSettings, uploadLedger } from "./picks.js";
 import { TRADES } from "./trades.js";
-import { WD, exchOf, fmtDay } from "./shared.js";
+import { WD, exchOf, fmtDay, FEATURED_MAX } from "./shared.js";
 
 const emptyRec = () => ({ type: "reaction", ticker: "", name: "", date: new Date().toISOString().slice(0, 10), pct: "", pnl: "", predicted: "SUBIR", probUp: "", nota: "" });
 
@@ -275,7 +275,9 @@ function DestaqueAdmin({ token, onAuthFail }) {
   // marcar ★ → também corre a análise + as 5 pesquisas aprofundadas e guarda-as no card
   const setFeatured = async (key) => {
     const turningOn = !picks[key].featured;
-    const next = {}; for (const [k, v] of Object.entries(picks)) next[k] = { ...v, featured: k === key ? turningOn : false };
+    const featCount = Object.values(picks).filter((v) => v.featured).length;
+    if (turningOn && featCount >= FEATURED_MAX) { alert(`Máximo de ${FEATURED_MAX} escolhas do trader. Desmarca uma primeiro.`); return; }
+    const next = {}; for (const [k, v] of Object.entries(picks)) next[k] = { ...v, featured: k === key ? turningOn : v.featured };
     persist(next);
     if (!turningOn) return;
     const ticker = picks[key].ticker;
@@ -308,10 +310,10 @@ function DestaqueAdmin({ token, onAuthFail }) {
   };
   const setNota = (key, val) => setPicks((p) => ({ ...p, [key]: { ...p[key], nota: val } }));
   const saveNotas = () => persist(picks);
-  const featuredKey = entries.find(([, v]) => v.featured)?.[0];
+  const featTickers = entries.filter(([, v]) => v.featured).map(([, v]) => v.ticker);
   return (
     <div>
-      <div className="ad-bar">Escolha do trader · marca <b>UMA</b> ação publicada com <b>★</b> — aparece em destaque no topo do site. {featuredKey ? <>Atual: <b>{picks[featuredKey].ticker}</b></> : <span style={{ color: "#D6A445" }}>nenhuma escolhida</span>} · <span style={{ color: saved ? "#2FA37A" : "#D6A445" }}>{saved ? "guardado ✓" : "a guardar…"}</span></div>
+      <div className="ad-bar">Escolha do trader · marca até <b>{FEATURED_MAX}</b> ações publicadas com <b>★</b> — aparecem lado a lado no topo do site. {featTickers.length ? <>Atuais ({featTickers.length}/{FEATURED_MAX}): <b>{featTickers.join(", ")}</b></> : <span style={{ color: "#D6A445" }}>nenhuma escolhida</span>} · <span style={{ color: saved ? "#2FA37A" : "#D6A445" }}>{saved ? "guardado ✓" : "a guardar…"}</span></div>
       {!entries.length ? <div className="ad-muted">Sem picks publicadas. Publica no Painel de análise primeiro.</div> : (
         <>
           <div className="ad-muted" style={{ marginBottom: 8 }}>Escreve o motivo (nota) e clica <b>Guardar notas</b>. O <b>★</b> grava logo e <b>corre as 5 pesquisas aprofundadas</b> da ação (aparecem no card do site). {busyTicker && <span style={{ color: "#D6A445" }}>⏳ a analisar {busyTicker}…</span>}</div>
