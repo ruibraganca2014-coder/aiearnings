@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import { fetchPublished, fetchPositions, fetchPrices, daysBetween, subscribeEmail, fetchHistory, fetchSettings, fetchLedger, fetchTape } from "./picks.js";
-import { WD, exchOf, fmtDay } from "./shared.js";
+import { WD, exchOf, fmtDay, fmtName } from "./shared.js";
 
 export const eur = (n) => (n < 0 ? "−" : "") + "€" + Math.abs(Math.round(n)).toLocaleString("pt-PT");
 const CUR_SYM = { USD: "$", EUR: "€", GBP: "£", JPY: "¥", CHF: "CHF ", CAD: "C$", AUD: "A$", HKD: "HK$", SGD: "S$", NOK: "kr ", DKK: "kr ", SEK: "kr ", PLN: "zł " };
@@ -133,7 +133,7 @@ export function StockModal({ pick, onClose }) {
     <div className="ts-modal" onClick={onClose}>
       <div className="ts-modalbox" onClick={(e) => e.stopPropagation()}>
         <button className="ts-modalx" onClick={onClose}>✕</button>
-        <div className="ts-modalhd"><CompanyLogo ticker={p.ticker} sector={p.sector} website={p.website} /><div><div className="ts-tptic">{p.ticker} <span className="ts-aitag">IA</span></div><div className="ts-tpname">{p.name}{p.isin && <span className="ts-isin"> · ISIN {p.isin}</span>}</div></div>{p.probUp != null && <span className="ts-ftbadge" style={{ background: probColor(p.probUp), marginLeft: "auto" }}>↑ {p.probUp}%</span>}</div>
+        <div className="ts-modalhd"><CompanyLogo ticker={p.ticker} sector={p.sector} website={p.website} /><div><div className="ts-tptic">{p.ticker} <span className="ts-aitag">IA</span></div><div className="ts-tpname">{fmtName(p.name)}{p.isin && <span className="ts-isin"> · ISIN {p.isin}</span>}</div></div>{p.probUp != null && <span className="ts-ftbadge" style={{ background: probColor(p.probUp), marginLeft: "auto" }}>↑ {p.probUp}%</span>}</div>
         {p.history && p.history.length > 1 && <div className="ts-tpchart" style={{ width: "100%", margin: "12px 0" }}><Spark hist={p.history} marks={p.earningsMarks} /></div>}
         <div className="ts-mmetrics">
           <M l="Probabilidade de subir" v={p.probUp != null ? p.probUp + "%" : null} c={probColor(p.probUp)} />
@@ -176,7 +176,7 @@ function TraderPick({ pick, onDetail }) {
 
         <div className="ts-tpbody">
           <div className="ts-tpleft">
-            <div className="ts-tptop"><CompanyLogo ticker={p.ticker} sector={p.sector} website={p.website} /><div><div className="ts-tptic">{p.ticker} <span className="ts-aitag">IA</span>{p.sector && THEME_LABELS[p.sector] && <span className="ts-themetag">{THEME_LABELS[p.sector]}</span>}</div><div className="ts-tpname">{p.name}{p.isin && <span className="ts-isin"> · ISIN {p.isin}</span>}</div></div></div>
+            <div className="ts-tptop"><CompanyLogo ticker={p.ticker} sector={p.sector} website={p.website} /><div><div className="ts-tptic">{p.ticker} <span className="ts-aitag">IA</span>{p.sector && THEME_LABELS[p.sector] && <span className="ts-themetag">{THEME_LABELS[p.sector]}</span>}</div><div className="ts-tpname">{fmtName(p.name)}{p.isin && <span className="ts-isin"> · ISIN {p.isin}</span>}</div></div></div>
             {p.nota && <div className="ts-tpnota">“{p.nota}”</div>}
           </div>
           {p.history && p.history.length > 1 && <div className="ts-tpchart"><Spark hist={p.history} marks={p.earningsMarks} /></div>}
@@ -291,7 +291,7 @@ export function Featured({ picks, suspenso, onDetail }) {
             onClick={() => onDetail && onDetail(p)}
             title={"Clica para ver o detalhe de " + p.ticker}>
             <div className="ts-feathd"><span className="ts-fttic"><CompanyLogo ticker={p.ticker} sector={p.sector} website={p.website} /> {p.ticker} <span className="ts-aitag" title="Análise assistida por IA">IA</span></span>{suspenso ? <span className="ts-ftbadge" style={{ background: "#8CA3B3" }}>SUSPENSO</span> : p.probUp != null ? <span className="ts-ftbadge" style={{ background: probColor(p.probUp) }}>↑ {p.probUp}%</span> : null}</div>
-            <div className="ts-ftname">{p.name}{p.sector && THEME_LABELS[p.sector] && <span className="ts-themetag">{THEME_LABELS[p.sector]}</span>}</div>
+            <div className="ts-ftname">{fmtName(p.name)}{p.sector && THEME_LABELS[p.sector] && <span className="ts-themetag">{THEME_LABELS[p.sector]}</span>}</div>
             <div className="ts-ftmeta">{p.exch || "EUA"}{p.entryISO ? " · entrar " + fmtDay(p.entryISO) : ""}</div>
             {hasA && !suspenso && (
               <>
@@ -324,7 +324,7 @@ function Predictions({ picks, suspenso, onDetail }) {
   const [err, setErr] = useState("");
   useEffect(() => {
     const from = new Date().toISOString().slice(0, 10);
-    const to = new Date(Date.now() + 21 * 864e5).toISOString().slice(0, 10); // 21 dias
+    const to = new Date(Date.now() + 7 * 864e5).toISOString().slice(0, 10); // 1 semana
     fetch(`/api/yahoo/calendar?from=${from}&to=${to}`)
       .then((r) => r.json())
       .then((a) => setRows((a || []).filter((x) => !x.past)))
@@ -354,7 +354,7 @@ function Predictions({ picks, suspenso, onDetail }) {
                 title={"Clica para ver o detalhe de " + it.ticker}>
                 <span className="ts-ptic">{it.ticker}</span>
                 <span className="ts-pex">{exchOf(it.ticker)}</span>
-                <span className="ts-pname">{it.name}</span>{it.sector && THEME_LABELS[it.sector] && <span className="ts-themetag">{THEME_LABELS[it.sector]}</span>}
+                <span className="ts-pname">{fmtName(it.name)}</span>{it.sector && THEME_LABELS[it.sector] && <span className="ts-themetag">{THEME_LABELS[it.sector]}</span>}
                 <span className="ts-pwhen">{it.when === "BMO" ? "pré-abertura" : it.when === "AMC" ? "após fecho" : ""}</span>
                 {!suspenso && picks[it.ticker]?.show && (() => { const p2 = picks[it.ticker]; const parts = []; if (p2.confidence != null) parts.push("conf " + p2.confidence + "%"); if (p2.ev != null) parts.push("EV " + (p2.ev >= 0 ? "+" : "") + p2.ev + "%"); if (p2.gapUp != null) parts.push("gap↑ " + p2.gapUp + "%"); if (p2.impliedMove != null) parts.push("±" + p2.impliedMove + "%"); return parts.length ? <span className="ts-pmetrics">{parts.join(" · ")}</span> : null; })()}
                 {suspenso
@@ -441,7 +441,7 @@ function Positions() {
           return (
             <div className={"ts-pos" + (under ? " under" : recovered ? " rec" : "")} key={p.ticker + p.buyDate}>
               <div className="ts-poshd"><span className="ts-postic">{p.ticker}</span><span className="ts-posex">{p.exch || "EUA"}</span></div>
-              <div className="ts-posname">{p.name}</div>
+              <div className="ts-posname">{fmtName(p.name)}</div>
               <div className="ts-poscount" style={{ color: under ? "#C8553D" : "#2FA37A" }}>
                 {under ? `⏳ ${days} ${days === 1 ? "dia" : "dias"} à espera` : recovered ? "✓ recuperou — pode vender" : "—"}
               </div>
@@ -722,9 +722,12 @@ export default function TraderSite() {
               <div className="ts-statgrid">
                 {led.netPL != null && <div className="ts-stat"><b style={{ color: led.netPL >= 0 ? "#2FA37A" : "#C8553D" }}>{led.netPL >= 0 ? "+" : ""}{eur(led.netPL)}</b><span>L/P líquido</span><small>após comissões · {led.n} trades</small></div>}
                 {led.netPL != null && <div className="ts-stat"><b style={{ color: led.netPL >= 0 ? "#2FA37A" : "#C8553D" }}>{led.netPL >= 0 ? "+" : ""}{(led.netPL / capitalBase * 100).toFixed(1)}%</b><span>rentabilidade</span><small>líquido sobre {eur(capitalBase)}</small></div>}
+                {led.totalPL != null && <div className="ts-stat"><b style={{ color: led.totalPL >= 0 ? "#2FA37A" : "#C8553D" }}>{led.totalPL >= 0 ? "+" : ""}{eur(led.totalPL)}</b><span>L/P bruto</span><small>antes de custos</small></div>}
                 {led.winRate != null && <div className="ts-stat"><b style={{ color: "#2FA37A" }}>{led.winRate}%</b><span>trades com lucro</span><small>{led.wins}/{led.n} ganharam</small></div>}
+                {led.lossCount != null && <div className="ts-stat"><b style={{ color: "#C8553D" }}>{led.lossCount}</b><span>trades com perda</span><small>{led.lossCount}/{led.n} perderam</small></div>}
                 {led.avgPct != null && <div className="ts-stat"><b style={{ color: led.avgPct >= 0 ? "#2FA37A" : "#C8553D" }}>{led.avgPct >= 0 ? "+" : ""}{led.avgPct}%</b><span>média por trade</span><small>retorno médio</small></div>}
                 {led.avgHold != null && <div className="ts-stat"><b>{led.avgHold}<small style={{ fontSize: "0.5em" }}> dias</small></b><span>tempo médio</span><small>entrada → saída</small></div>}
+                {led.stopCount != null && <div className="ts-stat"><b style={{ color: led.stopCount > 0 ? "#C8553D" : "var(--tx)" }}>{led.stopCount}</b><span>stops −10%</span><small>saídas no limite de risco</small></div>}
                 {led.best && <div className="ts-stat" onClick={() => goStock(led.best.ticker)} style={{ cursor: led.best.ticker ? "pointer" : "default" }}><b style={{ color: "#2FA37A" }}>+{led.best.pct}%</b><span>melhor trade</span><small>{led.best.ticker || led.best.name}</small></div>}
                 {led.worst && <div className="ts-stat" onClick={() => goStock(led.worst.ticker)} style={{ cursor: led.worst.ticker ? "pointer" : "default" }}><b style={{ color: "#C8553D" }}>{led.worst.pct}%</b><span>pior trade</span><small>{led.worst.ticker || led.worst.name}</small></div>}
                 {led.totalCost != null && <div className="ts-stat"><b style={{ color: "#C8553D" }}>−{eur(led.totalCost)}</b><span>custos totais</span><small>{led.costPerTrade != null ? "≈ €" + led.costPerTrade + "/trade" : "comissões + taxas"}</small></div>}
@@ -1077,7 +1080,7 @@ export const CSS = `
 /* grupos de balões */
 .ts-statwrap{display:flex;flex-direction:column;gap:18px;}
 .ts-statlbl{font-family:'Space Grotesk',sans-serif;font-size:13px;text-transform:uppercase;letter-spacing:.08em;color:var(--gold);margin:0 0 10px;padding-bottom:6px;border-bottom:1px solid var(--line);}
-.ts-feat--info{border-top-color:var(--gold)!important;display:flex;flex-direction:column;justify-content:center;background:rgba(214,164,69,.06);}
+.ts-feat--info{grid-column:1/-1;border-top-color:var(--gold)!important;display:flex;flex-direction:column;justify-content:center;background:rgba(214,164,69,.06);}
 .ts-ftinfotitle{font-family:'Space Grotesk',sans-serif;font-weight:700;color:var(--gold);font-size:14px;margin-bottom:8px;}
 .ts-feat--info p{color:var(--mut);font-size:12.5px;line-height:1.55;margin:0;}
 .ts-feat--info b{color:var(--tx);}

@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { fetchLedger } from "./picks.js";
 import { CSS, Spark, Mono, CompanyLogo, eur, fmtPrice, probColor, goStock } from "./TraderSite.jsx";
-import { fmtDay } from "./shared.js";
+import { fmtDay, fmtName } from "./shared.js";
 
 // Página de detalhe de uma ação: cotação + gráfico, próximos resultados, probabilidade IA,
 // métricas de mercado e o histórico das MINHAS operações nessa ação (do extrato DEGIRO).
@@ -41,7 +41,7 @@ export default function StockPage({ ticker }) {
               <CompanyLogo ticker={q.ticker} sector={q.sector} website={q.website} />
               <div className="sp-title">
                 <h1>{q.ticker} <span className="ts-aitag">IA</span></h1>
-                <div className="sp-name">{q.name}{q.sector && q.sector !== "other" && <span className="ts-ftsect">{q.sector}</span>}</div>
+                <div className="sp-name">{fmtName(q.name)}{q.sector && q.sector !== "other" && <span className="ts-ftsect">{q.sector}</span>}</div>
                 <div className="sp-sub">{isin ? "ISIN " + isin + " · " : ""}{q.earningsDate ? "próximos resultados " + fmtDay(q.earningsDate) : "sem data de resultados"}</div>
               </div>
               <div className="sp-price">
