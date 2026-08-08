@@ -287,6 +287,7 @@ function DestaqueAdmin({ token, onAuthFail }) {
       const ev = reac.length >= 4 ? pUp * mean(reac.filter((r) => r > 0)) + (1 - pUp) * mean(reac.filter((r) => r < 0)) : null;
       const types = ["financial", "equity", "earnings", "market"], research = {};
       await Promise.all(types.map(async (ty) => { try { const rr = await (await fetch(`/api/yahoo/research?symbol=${encodeURIComponent(ticker)}&type=${ty}`, { cache: "no-store" })).json(); if (rr && rr.text) research[ty] = rr.text; } catch {} }));
+      let isin = null; try { const led = await (await fetch("/api/ledger", { cache: "no-store" })).json(); isin = (led.trades || []).find((t) => t.ticker === ticker)?.isin || null; } catch {}
       const all = await fetchAll(token);
       all[key] = {
         ...all[key], featured: true, show: true, name: q.name || all[key].name,
@@ -298,6 +299,7 @@ function DestaqueAdmin({ token, onAuthFail }) {
         signals: q.lean?.signals || null, reactions: Array.isArray(q.reactions) ? q.reactions : null,
         reactionStd: q.reactionStd ?? null, reactionLow: q.reactionLow ?? null, reactionHigh: q.reactionHigh ?? null,
         reactionMin: q.reactionMin ?? null, reactionMax: q.reactionMax ?? null, reactionN: q.reactionN ?? null, shortPct: q.shortPct ?? null,
+        website: q.website || all[key].website || "", isin: isin || all[key].isin || null,
       };
       await savePicks(token, all);
       setPicks(all); setSaved(true);

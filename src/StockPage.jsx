@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { fetchLedger } from "./picks.js";
-import { CSS, Spark, Mono, eur, probColor, goStock } from "./TraderSite.jsx";
+import { CSS, Spark, Mono, CompanyLogo, eur, probColor, goStock } from "./TraderSite.jsx";
 import { fmtDay } from "./shared.js";
 
 // Página de detalhe de uma ação: cotação + gráfico, próximos resultados, probabilidade IA,
@@ -38,7 +38,7 @@ export default function StockPage({ ticker }) {
         {q && (
           <>
             <div className="sp-head">
-              <Mono ticker={q.ticker} sector={q.sector} />
+              <CompanyLogo ticker={q.ticker} sector={q.sector} website={q.website} />
               <div className="sp-title">
                 <h1>{q.ticker} <span className="ts-aitag">IA</span></h1>
                 <div className="sp-name">{q.name}{q.sector && q.sector !== "other" && <span className="ts-ftsect">{q.sector}</span>}</div>

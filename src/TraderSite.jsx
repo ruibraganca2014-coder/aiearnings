@@ -12,6 +12,15 @@ export function Mono({ ticker, sector }) {
   const init = String(ticker || "").replace(/\..*/, "").slice(0, 3);
   return <span className="ts-mono" style={{ background: colorFor(sector || ticker) }}>{init}</span>;
 }
+// Logo real da empresa (por ticker, via FMP; fallback favicon do site; senão iniciais).
+export function CompanyLogo({ ticker, sector, website }) {
+  const [step, setStep] = useState(0); // 0=FMP · 1=favicon · 2=iniciais
+  const t = String(ticker || "").replace(/\..*/, "");
+  const domain = website ? String(website).replace(/^https?:\/\//, "").replace(/^www\./, "").replace(/\/.*/, "").trim() : "";
+  if (t && step === 0) return <img className="ts-mono ts-logoimg" src={`https://financialmodelingprep.com/image-stock/${t}.png`} alt={ticker} loading="lazy" onError={() => setStep(domain ? 1 : 2)} />;
+  if (domain && step === 1) return <img className="ts-mono ts-logoimg" src={`https://www.google.com/s2/favicons?domain=${domain}&sz=64`} alt={ticker} loading="lazy" onError={() => setStep(2)} />;
+  return <Mono ticker={ticker} sector={sector} />;
+}
 const SPARK_PER = [["semana", "Sem"], ["mes", "Mês"], ["3m", "3M"], ["6m", "6M"], ["ano", "Ano"]];
 const SPARK_N = { semana: 5, mes: 22, "3m": 63, "6m": 126, ano: 260 };
 export function Spark({ hist, marks }) {
@@ -125,7 +134,7 @@ export function StockModal({ pick, onClose }) {
     <div className="ts-modal" onClick={onClose}>
       <div className="ts-modalbox" onClick={(e) => e.stopPropagation()}>
         <button className="ts-modalx" onClick={onClose}>✕</button>
-        <div className="ts-modalhd"><Mono ticker={p.ticker} sector={p.sector} /><div><div className="ts-tptic">{p.ticker} <span className="ts-aitag">IA</span></div><div className="ts-tpname">{p.name}{p.sector && p.sector !== "other" && <span className="ts-ftsect">{p.sector}</span>}</div></div>{p.probUp != null && <span className="ts-ftbadge" style={{ background: probColor(p.probUp), marginLeft: "auto" }}>↑ {p.probUp}%</span>}</div>
+        <div className="ts-modalhd"><CompanyLogo ticker={p.ticker} sector={p.sector} website={p.website} /><div><div className="ts-tptic">{p.ticker} <span className="ts-aitag">IA</span></div><div className="ts-tpname">{p.name}{p.isin && <span className="ts-isin"> · ISIN {p.isin}</span>}</div></div>{p.probUp != null && <span className="ts-ftbadge" style={{ background: probColor(p.probUp), marginLeft: "auto" }}>↑ {p.probUp}%</span>}</div>
         {p.nota && <div className="ts-tpnota">“{p.nota}”</div>}
         {p.history && p.history.length > 1 && <div className="ts-tpchart" style={{ width: "100%", margin: "12px 0" }}><Spark hist={p.history} marks={p.earningsMarks} /></div>}
         <div className="ts-mmetrics">
@@ -172,7 +181,7 @@ function TraderPick({ pick, onDetail }) {
         </div>
         <div className="ts-tpbody">
           <div className="ts-tpleft">
-            <div className="ts-tptop"><Mono ticker={p.ticker} sector={p.sector} /><div><div className="ts-tptic">{p.ticker} <span className="ts-aitag">IA</span>{p.sector && THEME_LABELS[p.sector] && <span className="ts-themetag">{THEME_LABELS[p.sector]}</span>}</div><div className="ts-tpname">{p.name}</div></div></div>
+            <div className="ts-tptop"><CompanyLogo ticker={p.ticker} sector={p.sector} website={p.website} /><div><div className="ts-tptic">{p.ticker} <span className="ts-aitag">IA</span>{p.sector && THEME_LABELS[p.sector] && <span className="ts-themetag">{THEME_LABELS[p.sector]}</span>}</div><div className="ts-tpname">{p.name}{p.isin && <span className="ts-isin"> · ISIN {p.isin}</span>}</div></div></div>
             {p.nota && <div className="ts-tpnota">“{p.nota}”</div>}
             <div className="ts-tpmetrics">
               {p.probUp != null && <div><span>Prob. subir</span><b style={{ color: probColor(p.probUp) }}>{p.probUp}%</b></div>}
@@ -269,7 +278,7 @@ export function Featured({ picks, suspenso, onDetail }) {
           <div className="ts-feat ts-feat--clk" key={p.ticker} style={{ borderTopColor: probColor(p.probUp) }}
             onClick={() => onDetail && onDetail(p)}
             title={"Clica para ver o detalhe de " + p.ticker}>
-            <div className="ts-feathd"><span className="ts-fttic"><Mono ticker={p.ticker} sector={p.sector} /> {p.ticker} <span className="ts-aitag" title="Análise assistida por IA">IA</span></span>{suspenso ? <span className="ts-ftbadge" style={{ background: "#8CA3B3" }}>SUSPENSO</span> : p.probUp != null ? <span className="ts-ftbadge" style={{ background: probColor(p.probUp) }}>↑ {p.probUp}%</span> : null}</div>
+            <div className="ts-feathd"><span className="ts-fttic"><CompanyLogo ticker={p.ticker} sector={p.sector} website={p.website} /> {p.ticker} <span className="ts-aitag" title="Análise assistida por IA">IA</span></span>{suspenso ? <span className="ts-ftbadge" style={{ background: "#8CA3B3" }}>SUSPENSO</span> : p.probUp != null ? <span className="ts-ftbadge" style={{ background: probColor(p.probUp) }}>↑ {p.probUp}%</span> : null}</div>
             <div className="ts-ftname">{p.name}{p.sector && p.sector !== "other" && <span className="ts-ftsect">{p.sector}</span>}</div>
             <div className="ts-ftmeta">{p.exch || "EUA"}{p.entryISO ? " · entrar " + fmtDay(p.entryISO) : ""}</div>
             {hasA && !suspenso && (
@@ -840,6 +849,8 @@ export const CSS = `
 .ts-ftmeta{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--mut);margin-top:8px;}
 .ts-feat.clik{cursor:pointer;}
 .ts-mono{display:inline-flex;align-items:center;justify-content:center;width:26px;height:20px;border-radius:5px;color:#0E1620;font-size:9.5px;font-weight:700;font-family:'IBM Plex Mono',monospace;vertical-align:middle;letter-spacing:-.02em;}
+.ts-logoimg{object-fit:contain;background:#fff;padding:2px;}
+.ts-isin{color:var(--mut);font-size:11px;font-family:'IBM Plex Mono',monospace;}
 .ts-ftsect{margin-left:8px;font-size:10px;color:var(--mut);border:1px solid var(--line);border-radius:5px;padding:1px 6px;text-transform:capitalize;}
 .ts-spark{width:100%;height:70px;background:var(--ink);border:1px solid var(--line);border-radius:8px;}
 .ts-ftdet>.ts-sparkwrap{display:block;margin-bottom:8px;}
