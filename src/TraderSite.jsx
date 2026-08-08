@@ -119,7 +119,6 @@ function FtCell({ l, v, c, sub, fill, fillc, sig, sigmax }) {
 
 // Modal de detalhe (abre ao clicar 2× numa ação). Mostra métricas + gráfico + pesquisa aprofundada.
 export function StockModal({ pick, onClose }) {
-  const [rTab, setRTab] = useState(null);
   useEffect(() => {
     const onKey = (e) => e.key === "Escape" && onClose();
     document.addEventListener("keydown", onKey);
@@ -127,8 +126,6 @@ export function StockModal({ pick, onClose }) {
   }, [onClose]);
   if (!pick) return null;
   const p = pick;
-  const research = p.research && typeof p.research === "object" ? p.research : null;
-  const rTypes = research ? Object.keys(RESEARCH_LABELS).filter((t) => research[t]) : [];
   const M = ({ l, v, c }) => v == null || v === "" ? null : <div className="ts-mmetric"><span>{l}</span><b style={c ? { color: c } : undefined}>{v}</b></div>;
   return (
     <div className="ts-modal" onClick={onClose}>
@@ -151,27 +148,15 @@ export function StockModal({ pick, onClose }) {
           <M l="Potencial vs alvo" v={p.targetUpside != null ? (p.targetUpside >= 0 ? "+" : "") + p.targetUpside + "%" : null} c={p.targetUpside >= 0 ? "#2FA37A" : "#C8553D"} />
           <M l="Beat (EPS)" v={p.beatRate != null ? p.beatRate + "%" : null} />
         </div>
-        {rTypes.length > 0 && (
-          <div className="ts-tpresearch">
-            <div className="ts-tprtabs">
-              <span className="ts-tprlabel">Pesquisa aprofundada:</span>
-              {rTypes.map((t) => <button key={t} className={rTab === t ? "on" : ""} onClick={() => setRTab(rTab === t ? null : t)}>{RESEARCH_LABELS[t]}</button>)}
-            </div>
-            {rTab && research[rTab] && <div className="ts-tprtext">{research[rTab]}</div>}
-          </div>
-        )}
-        <div className="ts-modalfoot"><a href={"#stock/" + p.ticker} onClick={onClose}>Ver página completa →</a> <span className="ts-tpnote">Probabilidade/opinião, não recomendação.</span></div>
+        <div className="ts-modalfoot"><span className="ts-tpnote">Probabilidade/opinião, não recomendação.</span></div>
       </div>
     </div>
   );
 }
 // Escolha do trader — a pick que o admin marcou com ★. Card grande no topo, clicável.
 function TraderPick({ pick, onDetail }) {
-  const [rTab, setRTab] = useState(null);
   if (!pick) return null;
   const p = pick;
-  const research = p.research && typeof p.research === "object" ? p.research : null;
-  const rTypes = research ? Object.keys(RESEARCH_LABELS).filter((t) => research[t]) : [];
   return (
     <section className="ts-sec ts-tpsec">
       <div className="ts-tpcard" style={{ borderColor: probColor(p.probUp) }} onClick={() => onDetail && onDetail(p)}>
@@ -216,16 +201,7 @@ function TraderPick({ pick, onDetail }) {
           {p.shortPct != null && <span><b>Short interest:</b> {p.shortPct}% do float</span>}
           {p.confidence != null && <span><b>Confiança IA:</b> {p.confidence}%{p.signals?.length ? ` · ${p.signals.length} sinais` : ""}{p.reactionN ? ` · ${p.reactionN} reações` : ""}</span>}
         </div>
-        {rTypes.length > 0 && (
-          <div className="ts-tpresearch" onClick={(e) => e.stopPropagation()}>
-            <div className="ts-tprtabs">
-              <span className="ts-tprlabel">Pesquisa aprofundada:</span>
-              {rTypes.map((t) => <button key={t} className={rTab === t ? "on" : ""} onClick={() => setRTab(rTab === t ? null : t)}>{RESEARCH_LABELS[t]}</button>)}
-            </div>
-            {rTab && research[rTab] && <div className="ts-tprtext">{research[rTab]}</div>}
-          </div>
-        )}
-        <div className="ts-tpfoot">Ver análise completa → <span className="ts-tpnote">Probabilidade/opinião, não recomendação.</span></div>
+        <div className="ts-tpfoot"><span className="ts-tpnote">Probabilidade/opinião, não recomendação.</span></div>
       </div>
     </section>
   );

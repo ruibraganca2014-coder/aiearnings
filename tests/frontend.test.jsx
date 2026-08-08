@@ -59,9 +59,4 @@ describe("StockModal", () => {
     fireEvent.click(screen.getByText("✕"));
     expect(onClose).toHaveBeenCalled();
   });
-  it("abre texto da pesquisa aprofundada", () => {
-    render(<StockModal pick={pick} onClose={() => {}} />);
-    fireEvent.click(screen.getByText("Análise financeira"));
-    expect(screen.getByText("Receita a crescer.")).toBeTruthy();
-  });
 });
