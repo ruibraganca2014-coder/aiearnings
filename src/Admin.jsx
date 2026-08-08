@@ -6,10 +6,13 @@ import { WD, exchOf, fmtDay } from "./shared.js";
 
 const emptyRec = () => ({ type: "reaction", ticker: "", name: "", date: new Date().toISOString().slice(0, 10), pct: "", pnl: "" });
 
-const RECOS = ["", "COMPRAR", "VENDER", "MANTER", "AGUARDAR", "NÃO", "NEUTRO"];
+const RECOS = ["", "SUBIR", "DESCER", "NEUTRO"];
 
 function Curadoria({ token, onAuthFail }) {
   const [rows, setRows] = useState(null);
+  const [past, setPast] = useState([]);
+  const [pastPred, setPastPred] = useState({}); // ticker -> previsão
+  const [pubMsg, setPubMsg] = useState({}); // ticker -> mensagem
   const [err, setErr] = useState("");
   const [picks, setPicks] = useState({});
   const [saved, setSaved] = useState(true);
@@ -20,10 +23,25 @@ function Curadoria({ token, onAuthFail }) {
     const to = new Date(Date.now() + 21 * 864e5).toISOString().slice(0, 10);
     fetch(`/api/yahoo/calendar?from=${from}&to=${to}`)
       .then((r) => r.json())
-      .then((a) => setRows((a || []).filter((x) => !x.past)))
+      .then((a) => {
+        setRows((a || []).filter((x) => !x.past));
+        setPast((a || []).filter((x) => x.past && x.reaction != null).sort((a, b) => b.date.localeCompare(a.date)));
+      })
       .catch((e) => setErr(String(e.message || e)));
     fetchAll(token).then(setPicks).catch((e) => { if (String(e.message) === "401") onAuthFail(); });
   }, [token]);
+
+  // publicar um resultado passado no histórico (com a previsão → alimenta a taxa de acerto)
+  const publishPast = async (it) => {
+    const predicted = pastPred[it.ticker] || (it.reaction >= 0 ? "SUBIR" : "DESCER");
+    const rec = { type: "reaction", ticker: it.ticker, name: it.name, date: it.date, pct: Math.round(it.reaction * 10) / 10, pnl: null, predicted, exch: exchOf(it.ticker), src: "calendar" };
+    try {
+      const h = await fetchHistory();
+      if (h.some((x) => x.ticker === it.ticker && x.date === it.date)) { setPubMsg((m) => ({ ...m, [it.ticker]: "já existe" })); return; }
+      await saveHistory(token, [...h, rec]);
+      setPubMsg((m) => ({ ...m, [it.ticker]: "✓ no histórico" }));
+    } catch (e) { if (String(e.message) === "401") return onAuthFail(); setPubMsg((m) => ({ ...m, [it.ticker]: "erro" })); }
+  };
 
   const set = (tk, patch, meta) => {
     const cur = picks[tk] || {};
@@ -52,6 +70,12 @@ function Curadoria({ token, onAuthFail }) {
     return Object.keys(g).sort().map((k) => ({ day: k, items: g[k] }));
   }, [rows]);
 
+  const pastGroups = useMemo(() => {
+    const g = {};
+    for (const it of past) { (g[it.date] = g[it.date] || []).push(it); }
+    return Object.keys(g).sort((a, b) => b.localeCompare(a)).slice(0, 4).map((k) => ({ day: k, items: g[k] }));
+  }, [past]);
+
   const published = Object.values(picks).filter((p) => p.show).length;
 
   if (err) return <div className="ad-muted">Erro ao carregar calendário: {err}</div>;
@@ -61,14 +85,14 @@ function Curadoria({ token, onAuthFail }) {
     <div>
       <div className="ad-bar">
         <b>{rows.length}</b> próximos · <b>{published}</b> publicados no site
-        <span className="ad-muted"> · escolhe ★ para mostrar no site e define a recomendação · </span>
+        <span className="ad-muted"> · escolhe ★ para mostrar no site e define a previsão (subir/descer) · </span>
         <span style={{ color: saved ? "#2FA37A" : "#D6A445" }}>{saved ? "✓ guardado" : "a guardar…"}</span>
       </div>
       {groups.map((grp) => (
         <div className="ad-day" key={grp.day}>
           <div className="ad-dayhdr">{WD[new Date(grp.day + "T00:00:00").getDay()]} · {fmtDay(grp.day)}</div>
           <table className="ad-tbl">
-            <thead><tr><th></th><th>Ticker</th><th>Bolsa</th><th>Quando</th><th>Análise</th><th>Recomendação</th><th>Nota (aparece no site)</th></tr></thead>
+            <thead><tr><th></th><th>Ticker</th><th>Bolsa</th><th>Quando</th><th>Análise</th><th>Previsão (subir/descer)</th><th>Nota (aparece no site)</th></tr></thead>
             <tbody>
               {grp.items.map((it) => {
                 const p = picks[it.ticker] || {};
@@ -106,6 +130,41 @@ function Curadoria({ token, onAuthFail }) {
           </table>
         </div>
       ))}
+
+      {pastGroups.length > 0 && (
+        <>
+          <div className="ad-dayhdr" style={{ marginTop: 22, color: "var(--tx)" }}>Resultados dos últimos 4 dias — publicar no histórico (com previsão → conta para o acerto)</div>
+          {pastGroups.map((grp) => (
+            <div className="ad-day" key={"p" + grp.day}>
+              <div className="ad-dayhdr">{WD[new Date(grp.day + "T00:00:00").getDay()]} · {fmtDay(grp.day)}</div>
+              <table className="ad-tbl">
+                <thead><tr><th>Ticker</th><th>Bolsa</th><th>Reação real</th><th>Previsão</th><th></th></tr></thead>
+                <tbody>
+                  {grp.items.map((it) => {
+                    const up = it.reaction >= 0;
+                    return (
+                      <tr key={it.ticker + it.date}>
+                        <td className="ad-tk">{it.ticker}<div className="ad-nm">{it.name}</div></td>
+                        <td><span className="ad-ex">{exchOf(it.ticker)}</span></td>
+                        <td style={{ color: up ? "#2FA37A" : "#C8553D", fontFamily: "'IBM Plex Mono',monospace" }}>{up ? "▲ subiu" : "▼ desceu"} {Math.abs(it.reaction).toFixed(1)}%</td>
+                        <td>
+                          <select className="ad-sel" value={pastPred[it.ticker] ?? (up ? "SUBIR" : "DESCER")} onChange={(e) => setPastPred((m) => ({ ...m, [it.ticker]: e.target.value }))}>
+                            {["SUBIR", "DESCER", "NEUTRO"].map((r) => <option key={r} value={r}>{r}</option>)}
+                          </select>
+                        </td>
+                        <td>
+                          <button className="ad-btn sm" onClick={() => publishPast(it)}>+ histórico</button>
+                          {pubMsg[it.ticker] && <span className="ad-muted" style={{ marginLeft: 8 }}>{pubMsg[it.ticker]}</span>}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          ))}
+        </>
+      )}
     </div>
   );
 }

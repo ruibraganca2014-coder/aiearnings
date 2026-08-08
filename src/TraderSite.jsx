@@ -3,7 +3,7 @@ import { fetchPublished, fetchPositions, fetchPrices, daysBetween, fetchLedger, 
 import { WD, exchOf, fmtDay } from "./shared.js";
 
 const eur = (n) => (n < 0 ? "−" : "") + "€" + Math.abs(Math.round(n)).toLocaleString("pt-PT");
-const recoColor = (r) => r === "COMPRAR" ? "#2FA37A" : (r === "NÃO" || r === "VENDER") ? "#C8553D" : "#D6A445"; // COMPRAR verde · NÃO/VENDER vermelho · MANTER/AGUARDAR/NEUTRO dourado
+const recoColor = (r) => r === "SUBIR" ? "#2FA37A" : r === "DESCER" ? "#C8553D" : "#D6A445"; // SUBIR verde · DESCER vermelho · NEUTRO dourado
 
 const POSTS = [
   { tag: "Educação", title: "O que é o gap de earnings", body: "A reação imediata de uma ação aos resultados (fecho antes → abertura depois). É das jogadas mais imprevisíveis — bater estimativas não garante subir (sell-the-news)." },
@@ -40,10 +40,10 @@ function CookieBanner() {
 }
 
 function Featured({ picks }) {
-  const list = Object.values(picks || {}).filter((p) => p.show && p.reco);
+  const list = Object.values(picks || {}).filter((p) => p.show && p.reco && exchOf(p.ticker) === "EUA")
+    .sort((a, b) => (a.entryISO || a.date || "").localeCompare(b.entryISO || b.date || ""))
+    .slice(0, 8); // as próximas 8 (EUA, por data)
   if (!list.length) return null;
-  const order = { COMPRAR: 0, MANTER: 1, AGUARDAR: 2, NEUTRO: 3, VENDER: 4, "NÃO": 5 };
-  list.sort((a, b) => (order[a.reco] ?? 3) - (order[b.reco] ?? 3));
   return (
     <div className="ts-featwrap">
       {list.map((p) => (
@@ -71,13 +71,12 @@ function Predictions({ picks }) {
   }, []);
   const groups = useMemo(() => {
     if (!rows) return [];
+    const us = rows.filter((it) => exchOf(it.ticker) === "EUA")
+      .sort((a, b) => (a.entryISO || a.date || "").localeCompare(b.entryISO || b.date || ""))
+      .slice(0, 8); // as próximas 8 previsões (EUA)
     const g = {};
-    for (const it of rows) {
-      if (exchOf(it.ticker) !== "EUA") continue; // só ações americanas
-      const k = it.entryISO || it.date;
-      (g[k] = g[k] || []).push(it);
-    }
-    return Object.keys(g).sort().map((k) => ({ day: k, items: g[k] })).slice(0, 4); // só os próximos 4 dias
+    for (const it of us) { const k = it.entryISO || it.date; (g[k] = g[k] || []).push(it); }
+    return Object.keys(g).sort().map((k) => ({ day: k, items: g[k] }));
   }, [rows]);
   if (err) return <div className="ts-muted">Não foi possível carregar a agenda ({err}).</div>;
   if (!rows) return <div className="ts-muted">A carregar a agenda da semana…</div>;
@@ -97,7 +96,7 @@ function Predictions({ picks }) {
                 <span className="ts-pwhen">{it.when === "BMO" ? "pré-abertura" : it.when === "AMC" ? "após fecho" : ""}</span>
                 {picks[it.ticker]?.show && picks[it.ticker]?.reco
                   ? <span className="ts-pbadge" style={{ background: recoColor(picks[it.ticker].reco) }}>{picks[it.ticker].reco}</span>
-                  : <span className="ts-plock" title="Análise COMPRAR/NÃO na área premium">🔒 premium</span>}
+                  : <span className="ts-plock" title="Probabilidade (subir/descer) na área premium">🔒 premium</span>}
               </div>
             ))}
           </div>
@@ -196,9 +195,11 @@ function Positions() {
 function Metodo() {
   const steps = [
     { n: "1", t: "Capital fixo", d: "Trabalho sempre com o mesmo montante (ex. €2.500). Não aumento a exposição quando corre bem." },
-    { n: "2", t: "Entrar antes dos resultados", d: "Compro pouco antes do anúncio da empresa. Uma posição de cada vez, sem alavancagem." },
-    { n: "3", t: "Se cair, esperar", d: "Não realizo perda no imediato — aguardo recuperar ao preço de compra (contador na secção Espera). Risco: nem toda a ação recupera." },
-    { n: "4", t: "Retirar o lucro", d: "Ao fim do mês retiro o ganho e reponho o capital no valor base. O objetivo é limitar exposição, não multiplicar risco." },
+    { n: "2", t: "Análise por IA", d: "Antes de entrar, vejo a probabilidade de a ação subir ou descer nos resultados (dados de mercado + IA). É probabilidade, não garantia." },
+    { n: "3", t: "Entrar antes dos resultados", d: "Compro pouco antes do anúncio da empresa. Uma posição de cada vez, sem alavancagem." },
+    { n: "4", t: "Diversificar e gerir risco", d: "Não concentro tudo numa ação; arrisco apenas uma fração do capital. Sobreviver às perdas é o que interessa." },
+    { n: "5", t: "Se cair, esperar", d: "Não realizo perda no imediato — aguardo recuperar ao preço de compra (contador na secção Posições). Risco: nem toda a ação recupera." },
+    { n: "6", t: "Retirar o lucro", d: "Ao fim do mês retiro o ganho e reponho o capital no valor base. Limitar exposição, não multiplicar risco." },
   ];
   return (
     <section id="site-metodo" className="ts-sec">
@@ -276,7 +277,15 @@ function Newsletter() {
 
 function HistoricoCalendario() {
   const [rows, setRows] = useState(null);
-  useEffect(() => { fetchHistory().then(setRows); }, []);
+  useEffect(() => {
+    const load = () => fetchHistory().then(setRows);
+    load();
+    const onVis = () => { if (!document.hidden) load(); };
+    window.addEventListener("focus", load);
+    document.addEventListener("visibilitychange", onVis);
+    const id = setInterval(load, 30000);
+    return () => { window.removeEventListener("focus", load); document.removeEventListener("visibilitychange", onVis); clearInterval(id); };
+  }, []);
   const days = useMemo(() => {
     if (!rows) return [];
     const g = {};
@@ -295,7 +304,7 @@ function HistoricoCalendario() {
       <h2>Histórico das posições anteriores</h2>
       <p className="ts-lead">Resultados anteriores (posições fechadas + documentos). <b>Análise assistida por IA</b> — informativo, não é recomendação.</p>
       <div className="ts-week">
-        {days.slice(0, 3).map((grp) => (
+        {days.slice(0, 4).map((grp) => (
           <div className="ts-daycard" key={grp.day}>
             <div className="ts-dayhdr">{WD[new Date(grp.day + "T00:00:00").getDay()]} · {fmtDay(grp.day)}</div>
             {grp.items.map((r, i) => (
@@ -317,7 +326,27 @@ function HistoricoCalendario() {
 
 export default function TraderSite() {
   const [picks, setPicks] = useState({});
-  useEffect(() => { fetchPublished().then(setPicks); }, []);
+  const [hist, setHist] = useState([]);
+  useEffect(() => {
+    const load = () => { fetchPublished().then(setPicks); fetchHistory().then((h) => setHist(Array.isArray(h) ? h : [])); };
+    load();
+    const onVis = () => { if (!document.hidden) load(); };
+    window.addEventListener("focus", load);
+    document.addEventListener("visibilitychange", onVis);
+    const id = setInterval(load, 30000); // atualiza sem recarregar
+    return () => { window.removeEventListener("focus", load); document.removeEventListener("visibilitychange", onVis); clearInterval(id); };
+  }, []);
+  const stats = useMemo(() => {
+    const h = hist.filter((r) => r.pct != null);
+    const n = h.length;
+    const mov = n ? h.reduce((a, r) => a + Math.abs(r.pct), 0) / n : 0;
+    const avgPct = n ? h.reduce((a, r) => a + r.pct, 0) / n : 0;
+    const lucro = hist.reduce((a, r) => a + (Number(r.pnl) || 0), 0);
+    const pred = h.filter((r) => r.predicted && r.predicted !== "NEUTRO");
+    const hits = pred.filter((r) => (r.predicted === "SUBIR" && r.pct > 0) || (r.predicted === "DESCER" && r.pct < 0)).length;
+    const acerto = pred.length ? Math.round(hits / pred.length * 100) : null;
+    return { n, mov, avgPct, lucro, acerto };
+  }, [hist]);
   return (
     <div className="ts-root">
       <style>{CSS}</style>
@@ -330,6 +359,7 @@ export default function TraderSite() {
         <nav>
           <a href="#site" onClick={() => window.scrollTo({ top: 0 })}>Início</a>
           <a href="#site-metodo">Método</a>
+          <a href="#site-stats">Estatísticas</a>
           <a href="#site-prev">Previsões</a>
           <a href="#site-pos">Posições</a>
           <a href="#site-hist">Histórico</a>
@@ -341,7 +371,13 @@ export default function TraderSite() {
 
       <section className="ts-hero">
         <h1>Resultados trimestrais, descodificados semana a semana</h1>
-        <p>Agenda dos earnings das maiores empresas (EUA + Europa), a que horas entrar, e o meu método de gestão de capital. Transparência total: mostro ganhos <b>e</b> perdas.</p>
+        <p>Probabilidade de uma ação <b>subir ou descer</b> nos resultados trimestrais, por análise de IA sobre dados de mercado (EUA + Europa). Não é aconselhamento financeiro — é leitura de probabilidades.</p>
+        <div className="ts-herostats">
+          {stats.acerto != null && <div><b>{stats.acerto}%</b><span>acerto IA</span></div>}
+          <div><b>{stats.n}</b><span>análises</span></div>
+          <div><b>±{stats.mov.toFixed(1)}%</b><span>mov. médio</span></div>
+          <div><b style={{ color: stats.lucro >= 0 ? "#2FA37A" : "#C8553D" }}>{stats.lucro >= 0 ? "+$" : "-$"}{Math.abs(Math.round(stats.lucro))}</b><span>resultado</span></div>
+        </div>
         <div className="ts-herocta">
           <a href="#site-metodo" className="ts-btn">Ver o método</a>
           <a href="#site-news" className="ts-btn ts-btnghost">Receber alertas</a>
@@ -351,11 +387,23 @@ export default function TraderSite() {
 
       <Metodo />
 
+      <section id="site-stats" className="ts-sec">
+        <h2>Estatísticas</h2>
+        <p className="ts-lead">Desempenho das previsões de direção (IA) sobre o histórico. São <b>probabilidades, não garantias</b> — amostra pequena, alta variância.</p>
+        <div className="ts-statgrid">
+          <div className="ts-stat"><b style={{ color: "#D6A445" }}>{stats.acerto != null ? stats.acerto + "%" : "—"}</b><span>acerto das previsões</span><small>previu a direção certa</small></div>
+          <div className="ts-stat"><b>{stats.n}</b><span>apresentações analisadas</span><small>no histórico</small></div>
+          <div className="ts-stat"><b>±{stats.mov.toFixed(1)}%</b><span>movimento médio</span><small>quanto mexeram nos resultados</small></div>
+          <div className="ts-stat"><b style={{ color: stats.lucro >= 0 ? "#2FA37A" : "#C8553D" }}>{stats.lucro >= 0 ? "+$" : "-$"}{Math.abs(Math.round(stats.lucro))}</b><span>resultado</span><small>média {stats.avgPct >= 0 ? "+" : ""}{stats.avgPct.toFixed(1)}%/trade</small></div>
+        </div>
+        <div className="ts-note">Resultados passados não garantem futuros. Não é aconselhamento financeiro; é análise probabilística assistida por IA.</div>
+      </section>
+
       <HistoricoCalendario />
 
       <section id="site-prev" className="ts-sec">
         <h2>Previsões desta semana</h2>
-        <p className="ts-lead">Quem reporta e quando entrar (hora de Portugal). As destacadas em baixo são as minhas escolhas — opinião, não recomendação garantida.</p>
+        <p className="ts-lead">Quem reporta e quando (hora de Portugal). As destacadas mostram a <b>probabilidade de subir ou descer</b> nos resultados, por análise de IA. Não é recomendação de compra/venda.</p>
         <Featured picks={picks} />
         <Predictions picks={picks} />
       </section>
@@ -451,6 +499,11 @@ const CSS = `
 .ts-pname{color:var(--mut);flex:1;min-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .ts-pwhen{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--mut);}
 .ts-plock{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--gold);}
+.ts-statgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;}
+.ts-stat{background:var(--s1);border:1px solid var(--line);border-radius:12px;padding:16px;text-align:center;}
+.ts-stat b{font-family:'IBM Plex Mono',monospace;font-size:30px;display:block;}
+.ts-stat span{display:block;font-size:12.5px;color:var(--tx);margin-top:4px;}
+.ts-stat small{display:block;font-size:11px;color:var(--mut);margin-top:3px;}
 .ts-featwrap{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px;margin-bottom:22px;}
 .ts-feat{background:var(--s1);border:1px solid var(--line);border-top:3px solid;border-radius:12px;padding:14px;}
 .ts-feathd{display:flex;justify-content:space-between;align-items:center;}
