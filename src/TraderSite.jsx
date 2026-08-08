@@ -611,7 +611,7 @@ export default function TraderSite() {
               <div className="ts-statgrid">
                 {saldo != null && <div className="ts-stat"><b>{eur(saldo)}</b><span>saldo da conta</span><small>capital atual</small></div>}
                 {settings.totalPL != null && <div className="ts-stat"><b style={{ color: totalPL >= 0 ? "#2FA37A" : "#C8553D" }}>{totalPL >= 0 ? "+" : ""}{eur(totalPL)}</b><span>Total L/P</span><small>desde o início da conta</small></div>}
-                {lucroMes != null && <div className="ts-stat"><b style={{ color: lucroMes >= 0 ? "#2FA37A" : "#C8553D" }}>{lucroMes >= 0 ? "+" : ""}{eur(lucroMes)}</b><span>lucro do mês</span><small>acima de {eur(capitalBase)} · retira no início do mês</small></div>}
+                {lucroMes != null && <div className="ts-stat"><b style={{ color: lucroMes >= 0 ? "#2FA37A" : "#C8553D" }}>{lucroMes >= 0 ? "+" : ""}{eur(lucroMes)}</b><span>lucro do mês</span><small>≈ {lucroMes >= 0 ? "+" : ""}{Math.round(lucroMes / capitalBase * 100)}% sobre {eur(capitalBase)} · retira no início</small></div>}
               </div>
             </div>
           )}
@@ -622,6 +622,7 @@ export default function TraderSite() {
               <h3 className="ts-statlbl">Trades reais · extrato ({led.n})</h3>
               <div className="ts-statgrid">
                 {led.netPL != null && <div className="ts-stat"><b style={{ color: led.netPL >= 0 ? "#2FA37A" : "#C8553D" }}>{led.netPL >= 0 ? "+" : ""}{eur(led.netPL)}</b><span>L/P líquido</span><small>após comissões · {led.n} trades</small></div>}
+                {led.netPL != null && <div className="ts-stat"><b style={{ color: led.netPL >= 0 ? "#2FA37A" : "#C8553D" }}>{led.netPL >= 0 ? "+" : ""}{(led.netPL / capitalBase * 100).toFixed(1)}%</b><span>rentabilidade</span><small>líquido sobre {eur(capitalBase)}</small></div>}
                 {led.winRate != null && <div className="ts-stat"><b style={{ color: "#2FA37A" }}>{led.winRate}%</b><span>trades com lucro</span><small>{led.wins}/{led.n} ganharam</small></div>}
                 {led.avgPct != null && <div className="ts-stat"><b style={{ color: led.avgPct >= 0 ? "#2FA37A" : "#C8553D" }}>{led.avgPct >= 0 ? "+" : ""}{led.avgPct}%</b><span>média por trade</span><small>retorno médio</small></div>}
                 {led.avgHold != null && <div className="ts-stat"><b>{led.avgHold}<small style={{ fontSize: "0.5em" }}> dias</small></b><span>tempo médio</span><small>entrada → saída</small></div>}

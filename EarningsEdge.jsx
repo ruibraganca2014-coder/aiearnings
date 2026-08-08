@@ -608,7 +608,7 @@ export default function EarningsEdge() {
         {calLoading && <div className="ee-loading"><span className="ee-dot" /><span className="ee-dot" /><span className="ee-dot" /> a procurar datas reais… (pode demorar até 1 min)</div>}
         {calErr && <div className="ee-error">{calErr} <button className="ee-inline-retry" onClick={loadCalendar}>tentar de novo</button></div>}
         {!calLoading && !calErr && calendar.length === 0 && (
-          <div className="ee-cal-empty">Sem datas para mostrar.</div>
+          <div className="ee-cal-empty">Sem datas para mostrar — ou a fonte (Yahoo) não respondeu. <button className="ee-inline-retry" onClick={loadCalendar}>tentar de novo</button></div>
         )}
         {!calLoading && (pastRows.length > 0 || calGroups.length > 0) && (
           <div className="ee-cal-scroll">
