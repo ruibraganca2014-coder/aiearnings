@@ -508,7 +508,7 @@ function Login({ onLogin }) {
 }
 
 export default function Admin() {
-  const [tab, setTab] = useState("cur");
+  const [tab, setTab] = useState("pos");
   const [token, setTok] = useState(getToken());
   const logout = () => { clearToken(); setTok(null); };
   if (!token) return <Login onLogin={setTok} />;
@@ -518,7 +518,6 @@ export default function Admin() {
       <header className="ad-nav">
         <div className="ad-brand"><span>AI</span>earnings <em>admin</em></div>
         <div className="ad-tabs">
-          <button className={tab === "cur" ? "on" : ""} onClick={() => setTab("cur")}>Curadoria</button>
           <button className={tab === "pos" ? "on" : ""} onClick={() => setTab("pos")}>Posições (espera)</button>
           <button className={tab === "trades" ? "on" : ""} onClick={() => setTab("trades")}>Trades</button>
           <button className={tab === "hist" ? "on" : ""} onClick={() => setTab("hist")}>Histórico (upload)</button>
@@ -530,9 +529,7 @@ export default function Admin() {
           <button className="ad-logout" onClick={logout}>Sair</button>
         </div>
       </header>
-      {tab === "cur" ? (
-        <div className="ad-wrap"><Curadoria token={token} onAuthFail={logout} /></div>
-      ) : tab === "pos" ? (
+      {tab === "pos" ? (
         <div className="ad-wrap"><PositionsAdmin token={token} onAuthFail={logout} /></div>
       ) : tab === "trades" ? (
         <div className="ad-wrap"><TradesAdmin token={token} onAuthFail={logout} /></div>

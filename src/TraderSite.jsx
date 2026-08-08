@@ -4,6 +4,7 @@ import { WD, exchOf, fmtDay } from "./shared.js";
 
 const eur = (n) => (n < 0 ? "−" : "") + "€" + Math.abs(Math.round(n)).toLocaleString("pt-PT");
 const recoColor = (r) => r === "SUBIR" ? "#2FA37A" : r === "DESCER" ? "#C8553D" : "#D6A445"; // SUBIR verde · DESCER vermelho · NEUTRO dourado
+const probColor = (v) => v == null ? "#8CA3B3" : v >= 55 ? "#2FA37A" : v <= 45 ? "#C8553D" : "#D6A445"; // cor pela probabilidade de subir
 
 const PALETTE = ["#2FA37A", "#D6A445", "#4F86C6", "#C8553D", "#8E7CC3", "#5BA3A0", "#C77DAB", "#B5843A"];
 const colorFor = (s) => PALETTE[[...String(s || "x")].reduce((a, c) => a + c.charCodeAt(0), 0) % PALETTE.length];
@@ -63,33 +64,24 @@ function CookieBanner() {
 }
 
 function Featured({ picks, suspenso }) {
-  const [open, setOpen] = useState(null);
-  const list = Object.values(picks || {}).filter((p) => p.show && p.reco && exchOf(p.ticker) === "EUA")
+  const list = Object.values(picks || {}).filter((p) => p.show && exchOf(p.ticker) === "EUA")
     .sort((a, b) => (a.entryISO || a.date || "").localeCompare(b.entryISO || b.date || ""))
-    .slice(0, 8); // as próximas 8 (EUA, por data)
+    .slice(0, 8); // as próximas 8 publicadas (EUA, por data)
   if (!list.length) return null;
   return (
     <div className="ts-featwrap">
       {list.map((p) => {
         const hasA = p.probUp != null || p.confidence != null || p.impliedMove != null || p.ev != null || p.gapUp != null || p.momentum != null || p.rsi != null || p.analyst || p.beatRate != null || p.history;
-        const isOpen = open === p.ticker;
         return (
-          <div className={"ts-feat" + (hasA ? " clik" : "")} key={p.ticker} style={{ borderTopColor: recoColor(p.reco) }} onClick={() => hasA && setOpen(isOpen ? null : p.ticker)}>
-            <div className="ts-feathd"><span className="ts-fttic"><Mono ticker={p.ticker} sector={p.sector} /> {p.ticker} <span className="ts-aitag" title="Análise assistida por IA">IA</span></span><span className="ts-ftbadge" style={{ background: suspenso ? "#8CA3B3" : recoColor(p.reco) }}>{suspenso ? "SUSPENSO" : p.reco}</span></div>
+          <div className="ts-feat" key={p.ticker} style={{ borderTopColor: probColor(p.probUp) }}>
+            <div className="ts-feathd"><span className="ts-fttic"><Mono ticker={p.ticker} sector={p.sector} /> {p.ticker} <span className="ts-aitag" title="Análise assistida por IA">IA</span></span>{suspenso ? <span className="ts-ftbadge" style={{ background: "#8CA3B3" }}>SUSPENSO</span> : p.probUp != null ? <span className="ts-ftbadge" style={{ background: probColor(p.probUp) }}>↑ {p.probUp}%</span> : null}</div>
             <div className="ts-ftname">{p.name}{p.sector && p.sector !== "other" && <span className="ts-ftsect">{p.sector}</span>}</div>
             {p.nota && <div className="ts-ftnote">“{p.nota}”</div>}
+            <div className="ts-ftmeta">{p.exch || "EUA"}{p.entryISO ? " · entrar " + fmtDay(p.entryISO) : ""}</div>
             {hasA && !suspenso && (
-              <div className="ts-ftana">
-                {p.probUp != null && <span>P↑ <b style={{ color: p.probUp >= 55 ? "#2FA37A" : p.probUp <= 45 ? "#C8553D" : "#D6A445" }}>{p.probUp}%</b></span>}
-                {p.confidence != null && <span>conf {p.confidence}%</span>}
-                {p.impliedMove != null && <span>±{p.impliedMove}%</span>}
-              </div>
-            )}
-            <div className="ts-ftmeta">{p.exch || "EUA"}{p.entryISO ? " · entrar " + fmtDay(p.entryISO) : ""}{p.gapUp != null ? " · gap↑ " + p.gapUp + "%" : ""}{hasA ? (isOpen ? " · fechar ▲" : " · análise ▼") : ""}</div>
-            {isOpen && !suspenso && (
-              <div className="ts-ftdet" onClick={(e) => e.stopPropagation()}>
+              <div className="ts-ftdet">
                 {p.history && <Spark hist={p.history} marks={p.earningsMarks} />}
-                {p.probUp != null && <div><span>Probabilidade de subir</span><b>{p.probUp}%</b></div>}
+                {p.probUp != null && <div><span>Probabilidade de subir</span><b style={{ color: p.probUp >= 55 ? "#2FA37A" : p.probUp <= 45 ? "#C8553D" : "#D6A445" }}>{p.probUp}%</b></div>}
                 {p.confidence != null && <div><span>Confiança</span><b>{p.confidence}%</b></div>}
                 {p.impliedMove != null && <div><span>Movimento implícito</span><b>±{p.impliedMove}%</b></div>}
                 {p.ev != null && <div><span>Valor esperado</span><b style={{ color: p.ev >= 0 ? "#2FA37A" : "#C8553D" }}>{p.ev >= 0 ? "+" : ""}{p.ev}%/trade</b></div>}
@@ -145,9 +137,11 @@ function Predictions({ picks, suspenso }) {
                 <span className="ts-pwhen">{it.when === "BMO" ? "pré-abertura" : it.when === "AMC" ? "após fecho" : ""}</span>
                 {suspenso
                   ? <span className="ts-pbadge" style={{ background: "#8CA3B3" }}>SUSPENSO</span>
-                  : picks[it.ticker]?.show && picks[it.ticker]?.reco
-                    ? <span className="ts-pbadge" style={{ background: recoColor(picks[it.ticker].reco) }}>{picks[it.ticker].reco}</span>
-                    : <span className="ts-plock" title="Probabilidade (subir/descer) na área premium">🔒 premium</span>}
+                  : picks[it.ticker]?.show && picks[it.ticker]?.probUp != null
+                    ? <span className="ts-pbadge" style={{ background: probColor(picks[it.ticker].probUp) }}>↑ {picks[it.ticker].probUp}%</span>
+                    : picks[it.ticker]?.show
+                      ? <span className="ts-pex">publicado</span>
+                      : <span className="ts-plock" title="Probabilidade na área premium">🔒 premium</span>}
               </div>
             ))}
           </div>
