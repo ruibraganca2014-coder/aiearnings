@@ -1096,8 +1096,8 @@ export const CSS = `
 /* grupos de balões */
 .ts-statwrap{display:flex;flex-direction:column;gap:18px;}
 .ts-statlbl{font-family:'Space Grotesk',sans-serif;font-size:13px;text-transform:uppercase;letter-spacing:.08em;color:var(--gold);margin:0 0 10px;padding-bottom:6px;border-bottom:1px solid var(--line);}
-.ts-feat--info{grid-column:1/-1;border-top-color:var(--gold)!important;display:flex;flex-direction:column;justify-content:center;background:rgba(214,164,69,.06);}
-.ts-ftinfotitle{font-family:'Space Grotesk',sans-serif;font-weight:700;color:var(--gold);font-size:14px;margin-bottom:8px;}
+.ts-feat--info{grid-column:1/-1;border-top-color:#2FA37A!important;display:flex;flex-direction:column;justify-content:center;background:rgba(47,163,122,.08);}
+.ts-ftinfotitle{font-family:'Space Grotesk',sans-serif;font-weight:700;color:#2FA37A;font-size:14px;margin-bottom:8px;}
 .ts-feat--info p{color:var(--mut);font-size:12.5px;line-height:1.55;margin:0;}
 .ts-feat--info b{color:var(--tx);}
 .ts-feat--clk{cursor:pointer;transition:transform .12s,box-shadow .12s;}
