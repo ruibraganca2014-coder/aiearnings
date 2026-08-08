@@ -1,0 +1,19 @@
+# Deploy no Render (render.com). Cria um "Blueprint" a partir do repo com este ficheiro.
+services:
+  - type: web
+    name: aiearnings
+    runtime: node
+    plan: starter            # 'free' também serve para testar (sem disco persistente)
+    buildCommand: npm install && npm run build
+    startCommand: node server.mjs
+    envVars:
+      - key: ADMIN_PASSWORD  # define no painel do Render (NÃO commitar)
+        sync: false
+      - key: ANTHROPIC_API_KEY  # opcional (extração por IA); define no painel
+        sync: false
+      - key: DATA_DIR
+        value: /data
+    disk:                    # disco persistente para curadoria/histórico
+      name: data
+      mountPath: /data
+      sizeGB: 1
