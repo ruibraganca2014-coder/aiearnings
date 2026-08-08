@@ -9,10 +9,8 @@ const DATA = process.env.DATA_DIR || join(DIR, "data"); // disco persistente em 
 const FILE = join(DATA, "picks.json");
 const POS_FILE = join(DATA, "positions.json");
 const HIST_FILE = join(DATA, "history.json");
-const LEDGER_FILE = join(DATA, "ledger.json");
 const EMAILS_FILE = join(DATA, "emails.json");
 const TRADES_FILE = join(DATA, "trades.json");
-const SETTINGS_FILE = join(DATA, "settings.json");
 
 // ---- picks (curadoria) ----
 export function readPicks() {
@@ -54,17 +52,6 @@ export function writeHistory(arr) {
   return arr;
 }
 
-// ---- ledger (depósitos/retiradas — plano de capital) ----
-export function readLedger() {
-  try { return JSON.parse(readFileSync(LEDGER_FILE, "utf8")); } catch { return []; }
-}
-export function writeLedger(arr) {
-  const d = dirname(LEDGER_FILE);
-  if (!existsSync(d)) mkdirSync(d, { recursive: true });
-  writeFileSync(LEDGER_FILE, JSON.stringify(Array.isArray(arr) ? arr : [], null, 2));
-  return arr;
-}
-
 // ---- emails (newsletter/alertas) ----
 export function readEmails() {
   try { return JSON.parse(readFileSync(EMAILS_FILE, "utf8")); } catch { return []; }
@@ -90,17 +77,6 @@ export function writeTrades(arr) {
   if (!existsSync(d)) mkdirSync(d, { recursive: true });
   writeFileSync(TRADES_FILE, JSON.stringify(Array.isArray(arr) ? arr : [], null, 2));
   return arr;
-}
-
-// ---- definições (ex. Total L/P real do DEGIRO) ----
-export function readSettings() {
-  try { return JSON.parse(readFileSync(SETTINGS_FILE, "utf8")); } catch { return {}; }
-}
-export function writeSettings(o) {
-  const d = dirname(SETTINGS_FILE);
-  if (!existsSync(d)) mkdirSync(d, { recursive: true });
-  writeFileSync(SETTINGS_FILE, JSON.stringify(o && typeof o === "object" ? o : {}, null, 2));
-  return o;
 }
 
 // ---- auth ----

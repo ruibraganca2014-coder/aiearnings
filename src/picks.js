@@ -44,16 +44,6 @@ export const daysBetween = (fromISO) => {
   return Math.max(0, Math.floor((b - a) / 864e5));
 };
 
-// ---- ledger (plano de capital) ----
-export async function fetchLedger() {
-  try { const r = await fetch("/api/ledger", { cache: "no-store" }); return r.ok ? await r.json() : []; } catch { return []; }
-}
-export async function saveLedger(token, ledger) {
-  const r = await fetch("/api/ledger", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + token }, body: JSON.stringify({ ledger }) });
-  if (r.status === 401) throw new Error("401");
-  if (!r.ok) throw new Error("http " + r.status);
-  return r.json();
-}
 // ---- emails ----
 export async function subscribeEmail(email) {
   const r = await fetch("/api/emails", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email }) });
@@ -89,17 +79,6 @@ export async function fetchTrades() {
 }
 export async function saveTrades(token, trades) {
   const r = await fetch("/api/trades", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + token }, body: JSON.stringify({ trades }) });
-  if (r.status === 401) throw new Error("401");
-  if (!r.ok) throw new Error("http " + r.status);
-  return r.json();
-}
-
-// ---- definições (Total L/P) ----
-export async function fetchSettings() {
-  try { const r = await fetch("/api/settings", { cache: "no-store" }); return r.ok ? await r.json() : {}; } catch { return {}; }
-}
-export async function saveSettings(token, settings) {
-  const r = await fetch("/api/settings", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + token }, body: JSON.stringify({ settings }) });
   if (r.status === 401) throw new Error("401");
   if (!r.ok) throw new Error("http " + r.status);
   return r.json();

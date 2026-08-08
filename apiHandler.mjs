@@ -1,8 +1,8 @@
 // Handler único da API — usado pelo Vite (dev) e pelo server.mjs (produção).
 import { realQuote, realCalendar, realResearch, realPrices, extractDoc } from "./yahooReal.mjs";
-import { readPicks, writePicks, publishedPicks, readPositions, writePositions, readLedger, writeLedger, readEmails, addEmail, readHistory, writeHistory, readTrades, writeTrades, readSettings, writeSettings, login, validToken } from "./store.mjs";
+import { readPicks, writePicks, publishedPicks, readPositions, writePositions, readEmails, addEmail, readHistory, writeHistory, readTrades, writeTrades, login, validToken } from "./store.mjs";
 
-const API_PREFIXES = ["/api/picks", "/api/auth", "/api/positions", "/api/ledger", "/api/emails", "/api/history", "/api/extract", "/api/trades", "/api/settings", "/api/yahoo/"];
+const API_PREFIXES = ["/api/picks", "/api/auth", "/api/positions", "/api/emails", "/api/history", "/api/extract", "/api/trades", "/api/yahoo/"];
 export const isApi = (url) => API_PREFIXES.some((p) => url.startsWith(p));
 
 const bodyJSON = (req) => new Promise((resolve) => {
@@ -47,14 +47,6 @@ export async function handleApi(req, res) {
       if (!Array.isArray(positions)) return send({ error: "positions inválido" }, 400), true;
       writePositions(positions); return send({ ok: true }), true;
     }
-    // ---- ledger ----
-    if (u.pathname === "/api/ledger" && req.method === "GET") return send(readLedger()), true;
-    if (u.pathname === "/api/ledger" && req.method === "POST") {
-      if (!auth()) return send({ error: "não autenticado" }, 401), true;
-      const { ledger } = await bodyJSON(req);
-      if (!Array.isArray(ledger)) return send({ error: "ledger inválido" }, 400), true;
-      writeLedger(ledger); return send({ ok: true }), true;
-    }
     // ---- emails ----
     if (u.pathname === "/api/emails" && req.method === "POST") {
       const { email } = await bodyJSON(req);
@@ -79,14 +71,6 @@ export async function handleApi(req, res) {
       const { trades } = await bodyJSON(req);
       if (!Array.isArray(trades)) return send({ error: "trades inválido" }, 400), true;
       writeTrades(trades); return send({ ok: true }), true;
-    }
-    // ---- settings (Total L/P, etc.) ----
-    if (u.pathname === "/api/settings" && req.method === "GET") return send(readSettings()), true;
-    if (u.pathname === "/api/settings" && req.method === "POST") {
-      if (!auth()) return send({ error: "não autenticado" }, 401), true;
-      const { settings } = await bodyJSON(req);
-      if (!settings || typeof settings !== "object") return send({ error: "settings inválido" }, 400), true;
-      writeSettings(settings); return send({ ok: true }), true;
     }
     // ---- extract (IA) ----
     if (u.pathname === "/api/extract" && req.method === "POST") {

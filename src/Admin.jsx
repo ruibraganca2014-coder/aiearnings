@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import EarningsEdge from "../EarningsEdge.jsx";
-import { getToken, setToken, clearToken, fetchAll, savePicks, login, fetchPositions, savePositions, fetchPrices, daysBetween, fetchLedger, saveLedger, fetchEmails, fetchHistory, saveHistory, extractDoc, fetchTrades, saveTrades, fetchSettings, saveSettings } from "./picks.js";
+import { getToken, setToken, clearToken, fetchAll, savePicks, login, fetchPositions, savePositions, fetchPrices, daysBetween, fetchHistory, saveHistory, extractDoc, fetchTrades, saveTrades, fetchEmails } from "./picks.js";
 import { TRADES } from "./trades.js";
 import { WD, exchOf, fmtDay } from "./shared.js";
 
@@ -60,13 +60,20 @@ function Curadoria({ token, onAuthFail }) {
     savePicks(token, next).then(() => setSaved(true)).catch((e) => { if (String(e.message) === "401") onAuthFail(); });
   };
 
-  const analyze = async (tk) => {
+  const analyze = async (it) => {
+    const tk = it.ticker;
     setAna((a) => ({ ...a, [tk]: { loading: true } }));
     try {
       const d = await fetch(`/api/yahoo/quote?symbol=${encodeURIComponent(tk)}`).then((r) => r.json());
-      const m = { probUp: d.lean?.probUp ?? null, gapUp: d.gapPctUp ?? null, gapAvg: d.gapAvg ?? null, impliedMove: d.impliedMove ?? null, pctUp: d.pctUp ?? null };
+      const m = {
+        probUp: d.lean?.probUp ?? null, confidence: d.lean?.confidence ?? null, gapUp: d.gapPctUp ?? null, gapAvg: d.gapAvg ?? null,
+        impliedMove: d.impliedMove ?? null, ev: d.avgStrategyReturn ?? null, pctUp: d.pctUp ?? null,
+        sector: d.sector ?? null, momentum: d.momentum ?? null, rsi: d.rsi ?? null, beatRate: d.beatRate ?? null,
+        targetUpside: d.targetUpside ?? null, analyst: d.analyst ?? null, price: d.price ?? null,
+        history: d.history ?? null, earningsMarks: d.earningsMarks ?? null,
+      };
       setAna((a) => ({ ...a, [tk]: { data: m } }));
-      set(tk, m); // guarda métricas no pick
+      set(tk, m, { name: it.name, exch: exchOf(tk), date: it.date, entryISO: it.entryISO, when: it.when }); // guarda métricas + meta no pick
     } catch (e) {
       setAna((a) => ({ ...a, [tk]: { error: String(e.message || e) } }));
     }
@@ -110,18 +117,19 @@ function Curadoria({ token, onAuthFail }) {
                 return (
                   <tr key={it.ticker} className={p.show ? "ad-on" : ""}>
                     <td><button className={"ad-star" + (p.show ? " on" : "")} title="Mostrar no site" onClick={() => set(it.ticker, { show: !p.show }, meta)}>★</button></td>
-                    <td className="ad-tk">{it.ticker}<div className="ad-nm">{it.name}</div></td>
+                    <td className="ad-tk">{it.ticker}<div className="ad-nm">{it.name}</div>{p.sector && p.sector !== "other" && <span className="ad-sect">{p.sector}</span>}</td>
                     <td><span className="ad-ex">{exchOf(it.ticker)}</span></td>
                     <td className="ad-when">{it.when === "BMO" ? "pré-abert." : it.when === "AMC" ? "após fecho" : "—"}</td>
                     <td className="ad-ana">
-                      {!a && <button className="ad-btn sm" onClick={() => analyze(it.ticker)}>Analisar</button>}
+                      {!a && <button className="ad-btn sm" onClick={() => analyze(it)}>Analisar</button>}
                       {a?.loading && <span className="ad-muted">…</span>}
                       {a?.error && <span className="ad-red">erro</span>}
                       {a?.data && (
                         <span className="ad-metrics">
                           {a.data.probUp != null && <b style={{ color: a.data.probUp >= 55 ? "#2FA37A" : a.data.probUp <= 45 ? "#C8553D" : "#D6A445" }}>P↑ {a.data.probUp}%</b>}
+                          {a.data.confidence != null && <>{" · "}conf {a.data.confidence}%</>}
+                          {a.data.ev != null && <>{" · "}EV {a.data.ev >= 0 ? "+" : ""}{a.data.ev}%</>}
                           {a.data.gapUp != null && <>{" · "}gap↑ {a.data.gapUp}%</>}
-                          {a.data.gapAvg != null && <>{" · "}méd {a.data.gapAvg > 0 ? "+" : ""}{a.data.gapAvg}%</>}
                           {a.data.impliedMove != null && <>{" · "}imp ±{a.data.impliedMove}%</>}
                         </span>
                       )}
@@ -261,119 +269,6 @@ function PositionsAdmin({ token, onAuthFail }) {
               );
             })}
           </tbody>
-        </table>
-      )}
-    </div>
-  );
-}
-
-function RendaAdmin({ token, onAuthFail }) {
-  const today = new Date().toISOString().slice(0, 10);
-  const [led, setLed] = useState([]);
-  const [emails, setEmails] = useState([]);
-  const [f, setF] = useState({ type: "deposit", amount: "", date: today, note: "" });
-  const [saved, setSaved] = useState(true);
-  const [totalPL, setTotalPL] = useState("");
-  const [saldo, setSaldo] = useState("");
-  const [diaPL, setDiaPL] = useState("");
-  const [carteira, setCarteira] = useState("");
-  const [pl3d, setPl3d] = useState("");
-  const [pl7d, setPl7d] = useState("");
-  const [pl1m, setPl1m] = useState("");
-  const [plSaved, setPlSaved] = useState(true);
-
-  useEffect(() => {
-    fetchLedger().then(setLed);
-    fetchSettings().then((s) => {
-      setTotalPL(s.totalPL != null ? String(s.totalPL) : ""); setSaldo(s.saldo != null ? String(s.saldo) : "");
-      setDiaPL(s.diaPL != null ? String(s.diaPL) : ""); setCarteira(s.carteira != null ? String(s.carteira) : "");
-      setPl3d(s.pl3d != null ? String(s.pl3d) : ""); setPl7d(s.pl7d != null ? String(s.pl7d) : ""); setPl1m(s.pl1m != null ? String(s.pl1m) : "");
-    });
-    fetchEmails(token).then(setEmails).catch((e) => { if (String(e.message) === "401") onAuthFail(); });
-  }, [token]);
-
-  const num = (v) => (v === "" ? null : Number(v));
-  const savePL = () => {
-    setPlSaved(false);
-    saveSettings(token, { totalPL: num(totalPL), saldo: num(saldo), diaPL: num(diaPL), carteira: num(carteira), pl3d: num(pl3d), pl7d: num(pl7d), pl1m: num(pl1m) }).then(() => setPlSaved(true)).catch((e) => { if (String(e.message) === "401") onAuthFail(); });
-  };
-
-  const persist = (next) => {
-    setLed(next); setSaved(false);
-    saveLedger(token, next).then(() => setSaved(true)).catch((e) => { if (String(e.message) === "401") onAuthFail(); });
-  };
-  const add = () => {
-    const amount = parseFloat(f.amount);
-    if (!amount || !f.date) return;
-    persist([...led, { type: f.type, amount, date: f.date, note: f.note.trim() }]);
-    setF({ type: "deposit", amount: "", date: today, note: "" });
-  };
-  const remove = (i) => persist(led.filter((_, j) => j !== i));
-
-  const sorted = [...led].sort((a, b) => (a.date || "").localeCompare(b.date || ""));
-  let bal = 0; const withRun = sorted.map((e) => { bal += (e.type === "withdraw" ? -1 : 1) * (+e.amount || 0); return { ...e, bal }; });
-  const dep = led.filter((e) => e.type !== "withdraw").reduce((a, e) => a + (+e.amount || 0), 0);
-  const wit = led.filter((e) => e.type === "withdraw").reduce((a, e) => a + (+e.amount || 0), 0);
-
-  return (
-    <div>
-      <div className="ad-form" style={{ alignItems: "center" }}>
-        <b style={{ fontSize: 13 }}>Total L/P €:</b>
-        <input className="ad-note" style={{ maxWidth: 120 }} type="number" step="0.01" placeholder="ex. 1153.15" value={totalPL} onChange={(e) => setTotalPL(e.target.value)} />
-        <b style={{ fontSize: 13 }}>Saldo €:</b>
-        <input className="ad-note" style={{ maxWidth: 120 }} type="number" step="0.01" placeholder="ex. 2776.88" value={saldo} onChange={(e) => setSaldo(e.target.value)} />
-        <b style={{ fontSize: 13 }}>Dia L/P €:</b>
-        <input className="ad-note" style={{ maxWidth: 110 }} type="number" step="0.01" placeholder="ex. 0" value={diaPL} onChange={(e) => setDiaPL(e.target.value)} />
-        <b style={{ fontSize: 13 }}>Posições abertas €:</b>
-        <input className="ad-note" style={{ maxWidth: 110 }} type="number" step="0.01" placeholder="ex. 0.98" value={carteira} onChange={(e) => setCarteira(e.target.value)} />
-        <b style={{ fontSize: 13 }}>L/P 3 dias €:</b>
-        <input className="ad-note" style={{ maxWidth: 100 }} type="number" step="0.01" placeholder="ex. 120" value={pl3d} onChange={(e) => setPl3d(e.target.value)} />
-        <b style={{ fontSize: 13 }}>L/P 7 dias €:</b>
-        <input className="ad-note" style={{ maxWidth: 100 }} type="number" step="0.01" placeholder="ex. 250" value={pl7d} onChange={(e) => setPl7d(e.target.value)} />
-        <b style={{ fontSize: 13 }}>L/P 1 mês €:</b>
-        <input className="ad-note" style={{ maxWidth: 100 }} type="number" step="0.01" placeholder="ex. 800" value={pl1m} onChange={(e) => setPl1m(e.target.value)} />
-        <button className="ad-btn sm" onClick={savePL}>Guardar</button>
-        <span style={{ color: plSaved ? "#2FA37A" : "#D6A445", fontSize: 12 }}>{plSaved ? "✓" : "…"}</span>
-        <span className="ad-muted" style={{ fontSize: 12 }}>aparece no site como "resultado total". Copia do teu DEGIRO.</span>
-      </div>
-      <div className="ad-bar">Plano de capital · depositado <b>€{Math.round(dep)}</b> · retirado <b>€{Math.round(wit)}</b> · saldo <b>€{Math.round(bal)}</b> · <span style={{ color: saved ? "#2FA37A" : "#D6A445" }}>{saved ? "✓ guardado" : "a guardar…"}</span></div>
-
-      <div className="ad-form">
-        <select className="ad-note" style={{ maxWidth: 130 }} value={f.type} onChange={(e) => setF({ ...f, type: e.target.value })}>
-          <option value="deposit">Depósito</option>
-          <option value="withdraw">Retirada (renda)</option>
-        </select>
-        <input className="ad-note" style={{ maxWidth: 120 }} type="number" step="0.01" placeholder="€ montante" value={f.amount} onChange={(e) => setF({ ...f, amount: e.target.value })} />
-        <input className="ad-note" style={{ maxWidth: 150 }} type="date" value={f.date} onChange={(e) => setF({ ...f, date: e.target.value })} />
-        <input className="ad-note" placeholder="nota" value={f.note} onChange={(e) => setF({ ...f, note: e.target.value })} />
-        <button className="ad-btn sm" onClick={add}>＋ Registar</button>
-      </div>
-
-      {!led.length ? <div className="ad-muted">Sem movimentos. Regista depósitos e retiradas.</div> : (
-        <table className="ad-tbl">
-          <thead><tr><th>Data</th><th>Tipo</th><th>Montante</th><th>Saldo</th><th>Nota</th><th></th></tr></thead>
-          <tbody>
-            {withRun.slice().reverse().map((e, ri) => {
-              const idx = led.findIndex((x) => x.date === e.date && x.type === e.type && x.amount === e.amount && (x.note || "") === (e.note || ""));
-              return (
-                <tr key={e.date + e.type + e.amount + ri}>
-                  <td>{e.date}</td>
-                  <td style={{ color: e.type === "withdraw" ? "#2FA37A" : "var(--tx)" }}>{e.type === "withdraw" ? "Retirada" : "Depósito"}</td>
-                  <td style={{ fontFamily: "'IBM Plex Mono',monospace" }}>{e.type === "withdraw" ? "−" : "+"}€{Math.round(e.amount)}</td>
-                  <td style={{ fontFamily: "'IBM Plex Mono',monospace" }}>€{Math.round(e.bal)}</td>
-                  <td className="ad-muted">{e.note}</td>
-                  <td><button className="ad-logout" onClick={() => remove(idx)}>×</button></td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      )}
-
-      <h3 style={{ marginTop: 24, fontFamily: "'Space Grotesk',sans-serif" }}>Subscritores ({emails.length})</h3>
-      {!emails.length ? <div className="ad-muted">Sem subscritores ainda.</div> : (
-        <table className="ad-tbl"><thead><tr><th>Email</th><th>Data</th></tr></thead>
-          <tbody>{emails.map((e, i) => <tr key={e.email + i}><td>{e.email}</td><td className="ad-muted">{e.date}</td></tr>)}</tbody>
         </table>
       )}
     </div>
@@ -540,6 +435,23 @@ function HistoricoAdmin({ token, onAuthFail }) {
   );
 }
 
+function SubscritoresAdmin({ token, onAuthFail }) {
+  const [emails, setEmails] = useState(null);
+  useEffect(() => { fetchEmails(token).then(setEmails).catch((e) => { if (String(e.message) === "401") onAuthFail(); }); }, [token]);
+  if (!emails) return <div className="ad-muted">A carregar…</div>;
+  return (
+    <div>
+      <div className="ad-bar">Subscritores da newsletter · <b>{emails.length}</b></div>
+      {!emails.length ? <div className="ad-muted">Sem subscritores ainda. Aparecem aqui quando alguém subscreve no site.</div> : (
+        <table className="ad-tbl">
+          <thead><tr><th>Email</th><th>Data</th></tr></thead>
+          <tbody>{emails.map((e, i) => <tr key={e.email + i}><td>{e.email}</td><td className="ad-muted">{e.date}</td></tr>)}</tbody>
+        </table>
+      )}
+    </div>
+  );
+}
+
 function Login({ onLogin }) {
   const [pw, setPw] = useState("");
   const [err, setErr] = useState("");
@@ -584,9 +496,9 @@ export default function Admin() {
         <div className="ad-tabs">
           <button className={tab === "cur" ? "on" : ""} onClick={() => setTab("cur")}>Curadoria</button>
           <button className={tab === "pos" ? "on" : ""} onClick={() => setTab("pos")}>Posições (espera)</button>
-          <button className={tab === "renda" ? "on" : ""} onClick={() => setTab("renda")}>Renda</button>
           <button className={tab === "trades" ? "on" : ""} onClick={() => setTab("trades")}>Trades</button>
           <button className={tab === "hist" ? "on" : ""} onClick={() => setTab("hist")}>Histórico (upload)</button>
+          <button className={tab === "subs" ? "on" : ""} onClick={() => setTab("subs")}>Subscritores</button>
           <button className={tab === "ana" ? "on" : ""} onClick={() => setTab("ana")}>Painel de análise</button>
         </div>
         <div className="ad-links">
@@ -598,12 +510,12 @@ export default function Admin() {
         <div className="ad-wrap"><Curadoria token={token} onAuthFail={logout} /></div>
       ) : tab === "pos" ? (
         <div className="ad-wrap"><PositionsAdmin token={token} onAuthFail={logout} /></div>
-      ) : tab === "renda" ? (
-        <div className="ad-wrap"><RendaAdmin token={token} onAuthFail={logout} /></div>
       ) : tab === "trades" ? (
         <div className="ad-wrap"><TradesAdmin token={token} onAuthFail={logout} /></div>
       ) : tab === "hist" ? (
         <div className="ad-wrap"><HistoricoAdmin token={token} onAuthFail={logout} /></div>
+      ) : tab === "subs" ? (
+        <div className="ad-wrap"><SubscritoresAdmin token={token} onAuthFail={logout} /></div>
       ) : (
         <div className="ad-embed"><EarningsEdge /></div>
       )}
@@ -633,6 +545,7 @@ const CSS = `
 .ad-star{background:none;border:none;color:var(--line);font-size:20px;cursor:pointer;line-height:1;}.ad-star.on{color:var(--gold);}
 .ad-tk{font-family:'Space Grotesk',sans-serif;font-weight:700;}.ad-nm{font-weight:400;font-size:11px;color:var(--mut);max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .ad-ex{font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--gold);border:1px solid var(--line);border-radius:5px;padding:1px 5px;}
+.ad-sect{display:inline-block;margin-top:3px;font-size:10px;color:var(--mut);border:1px solid var(--line);border-radius:5px;padding:1px 6px;text-transform:capitalize;}
 .ad-when{font-size:12px;color:var(--mut);}
 .ad-metrics{font-family:'IBM Plex Mono',monospace;font-size:11.5px;}
 .ad-btn{background:var(--gold);color:#1a1206;border:none;border-radius:7px;padding:8px 14px;font-weight:600;cursor:pointer;}

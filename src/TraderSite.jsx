@@ -1,9 +1,32 @@
 import { useState, useEffect, useMemo, useRef } from "react";
-import { fetchPublished, fetchPositions, fetchPrices, daysBetween, fetchLedger, subscribeEmail, fetchHistory, fetchSettings } from "./picks.js";
+import { fetchPublished, fetchPositions, fetchPrices, daysBetween, subscribeEmail, fetchHistory } from "./picks.js";
 import { WD, exchOf, fmtDay } from "./shared.js";
 
 const eur = (n) => (n < 0 ? "−" : "") + "€" + Math.abs(Math.round(n)).toLocaleString("pt-PT");
 const recoColor = (r) => r === "SUBIR" ? "#2FA37A" : r === "DESCER" ? "#C8553D" : "#D6A445"; // SUBIR verde · DESCER vermelho · NEUTRO dourado
+
+const PALETTE = ["#2FA37A", "#D6A445", "#4F86C6", "#C8553D", "#8E7CC3", "#5BA3A0", "#C77DAB", "#B5843A"];
+const colorFor = (s) => PALETTE[[...String(s || "x")].reduce((a, c) => a + c.charCodeAt(0), 0) % PALETTE.length];
+function Mono({ ticker, sector }) {
+  const init = String(ticker || "").replace(/\..*/, "").slice(0, 3);
+  return <span className="ts-mono" style={{ background: colorFor(sector || ticker) }}>{init}</span>;
+}
+function Spark({ hist, marks }) {
+  if (!hist || hist.length < 2) return null;
+  const data = hist.slice(-160);
+  const cs = data.map((x) => x.c), min = Math.min(...cs), max = Math.max(...cs), W = 300, H = 70;
+  const px = (i) => (i * W / (data.length - 1));
+  const py = (c) => H - (c - min) / (max - min || 1) * H;
+  const path = data.map((x, i) => (i ? "L" : "M") + px(i).toFixed(1) + " " + py(x.c).toFixed(1)).join(" ");
+  const up = cs[cs.length - 1] >= cs[0];
+  const markSet = new Set(marks || []);
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} className="ts-spark" preserveAspectRatio="none">
+      {data.map((x, i) => markSet.has(x.d) ? <line key={i} x1={px(i)} y1="0" x2={px(i)} y2={H} stroke="#D6A445" strokeWidth="1" strokeDasharray="2 3" opacity="0.5" /> : null)}
+      <path d={path} fill="none" stroke={up ? "#2FA37A" : "#C8553D"} strokeWidth="1.6" />
+    </svg>
+  );
+}
 
 const POSTS = [
   { tag: "Educação", title: "O que é o gap de earnings", body: "A reação imediata de uma ação aos resultados (fecho antes → abertura depois). É das jogadas mais imprevisíveis — bater estimativas não garante subir (sell-the-news)." },
@@ -40,20 +63,46 @@ function CookieBanner() {
 }
 
 function Featured({ picks, suspenso }) {
+  const [open, setOpen] = useState(null);
   const list = Object.values(picks || {}).filter((p) => p.show && p.reco && exchOf(p.ticker) === "EUA")
     .sort((a, b) => (a.entryISO || a.date || "").localeCompare(b.entryISO || b.date || ""))
     .slice(0, 8); // as próximas 8 (EUA, por data)
   if (!list.length) return null;
   return (
     <div className="ts-featwrap">
-      {list.map((p) => (
-        <div className="ts-feat" key={p.ticker} style={{ borderTopColor: recoColor(p.reco) }}>
-          <div className="ts-feathd"><span className="ts-fttic">{p.ticker} <span className="ts-aitag" title="Análise assistida por IA">IA</span></span><span className="ts-ftbadge" style={{ background: suspenso ? "#8CA3B3" : recoColor(p.reco) }}>{suspenso ? "SUSPENSO" : p.reco}</span></div>
-          <div className="ts-ftname">{p.name}</div>
-          {p.nota && <div className="ts-ftnote">“{p.nota}”</div>}
-          <div className="ts-ftmeta">{p.exch || "EUA"}{p.entryISO ? " · entrar " + fmtDay(p.entryISO) : ""}{p.gapUp != null ? " · gap↑ " + p.gapUp + "%" : ""}</div>
-        </div>
-      ))}
+      {list.map((p) => {
+        const hasA = p.probUp != null || p.confidence != null || p.impliedMove != null || p.ev != null || p.gapUp != null || p.momentum != null || p.rsi != null || p.analyst || p.beatRate != null || p.history;
+        const isOpen = open === p.ticker;
+        return (
+          <div className={"ts-feat" + (hasA ? " clik" : "")} key={p.ticker} style={{ borderTopColor: recoColor(p.reco) }} onClick={() => hasA && setOpen(isOpen ? null : p.ticker)}>
+            <div className="ts-feathd"><span className="ts-fttic"><Mono ticker={p.ticker} sector={p.sector} /> {p.ticker} <span className="ts-aitag" title="Análise assistida por IA">IA</span></span><span className="ts-ftbadge" style={{ background: suspenso ? "#8CA3B3" : recoColor(p.reco) }}>{suspenso ? "SUSPENSO" : p.reco}</span></div>
+            <div className="ts-ftname">{p.name}{p.sector && p.sector !== "other" && <span className="ts-ftsect">{p.sector}</span>}</div>
+            {p.nota && <div className="ts-ftnote">“{p.nota}”</div>}
+            {hasA && !suspenso && (
+              <div className="ts-ftana">
+                {p.probUp != null && <span>P↑ <b style={{ color: p.probUp >= 55 ? "#2FA37A" : p.probUp <= 45 ? "#C8553D" : "#D6A445" }}>{p.probUp}%</b></span>}
+                {p.confidence != null && <span>conf {p.confidence}%</span>}
+                {p.impliedMove != null && <span>±{p.impliedMove}%</span>}
+              </div>
+            )}
+            <div className="ts-ftmeta">{p.exch || "EUA"}{p.entryISO ? " · entrar " + fmtDay(p.entryISO) : ""}{p.gapUp != null ? " · gap↑ " + p.gapUp + "%" : ""}{hasA ? (isOpen ? " · fechar ▲" : " · análise ▼") : ""}</div>
+            {isOpen && !suspenso && (
+              <div className="ts-ftdet" onClick={(e) => e.stopPropagation()}>
+                {p.history && <Spark hist={p.history} marks={p.earningsMarks} />}
+                {p.probUp != null && <div><span>Probabilidade de subir</span><b>{p.probUp}%</b></div>}
+                {p.confidence != null && <div><span>Confiança</span><b>{p.confidence}%</b></div>}
+                {p.impliedMove != null && <div><span>Movimento implícito</span><b>±{p.impliedMove}%</b></div>}
+                {p.ev != null && <div><span>Valor esperado</span><b style={{ color: p.ev >= 0 ? "#2FA37A" : "#C8553D" }}>{p.ev >= 0 ? "+" : ""}{p.ev}%/trade</b></div>}
+                {p.gapUp != null && <div><span>Gap histórico ↑</span><b>{p.gapUp}%</b></div>}
+                {(p.momentum != null || p.rsi != null) && <div><span>Momentum / RSI</span><b>{p.momentum != null ? (p.momentum >= 0 ? "+" : "") + p.momentum + "%" : "—"} / {p.rsi ?? "—"}</b></div>}
+                {p.analyst && <div><span>Analistas</span><b style={{ textTransform: "capitalize" }}>{p.analyst}{p.targetUpside != null ? ` · alvo ${p.targetUpside >= 0 ? "+" : ""}${p.targetUpside}%` : ""}</b></div>}
+                {p.beatRate != null && <div><span>Taxa de beat</span><b>{p.beatRate}%</b></div>}
+                <div className="ts-ftwarn">⚠ Probabilidade, não garantia. Edge fraco (histórico ~moeda ao ar). Não é recomendação.</div>
+              </div>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -216,42 +265,6 @@ function Metodo() {
   );
 }
 
-function Evolucao() {
-  const [led, setLed] = useState(null);
-  useEffect(() => { fetchLedger().then(setLed); }, []);
-  const series = useMemo(() => {
-    if (!led || !led.length) return [];
-    const sorted = [...led].sort((a, b) => (a.date || "").localeCompare(b.date || ""));
-    let bal = 0;
-    return sorted.map((e) => { bal += (e.type === "withdraw" ? -1 : 1) * (Number(e.amount) || 0); return { date: e.date, bal }; });
-  }, [led]);
-  if (!led) return null;
-  if (!series.length) return null;
-  const W = 640, H = 180, pad = 30;
-  const min = Math.min(0, ...series.map((s) => s.bal)), max = Math.max(...series.map((s) => s.bal), 1);
-  const x = (i) => pad + i * (W - 2 * pad) / Math.max(1, series.length - 1);
-  const y = (v) => H - pad - (v - min) / (max - min || 1) * (H - 2 * pad);
-  const path = series.map((s, i) => (i ? "L" : "M") + x(i).toFixed(1) + " " + y(s.bal).toFixed(1)).join(" ");
-  const totalDep = led.filter((e) => e.type !== "withdraw").reduce((a, e) => a + (+e.amount || 0), 0);
-  const totalWit = led.filter((e) => e.type === "withdraw").reduce((a, e) => a + (+e.amount || 0), 0);
-  return (
-    <section id="site-evo" className="ts-sec">
-      <h2>Evolução do capital</h2>
-      <p className="ts-lead">Depósitos e retiradas reais (transparência). Saldo em conta ao longo do tempo.</p>
-      <div className="ts-evostats">
-        <div><span>Depositado</span><b>{eur(totalDep)}</b></div>
-        <div><span>Retirado (renda)</span><b style={{ color: "#2FA37A" }}>{eur(totalWit)}</b></div>
-        <div><span>Saldo atual</span><b>{eur(series[series.length - 1].bal)}</b></div>
-      </div>
-      <svg viewBox={`0 0 ${W} ${H}`} className="ts-evochart" preserveAspectRatio="none">
-        <line x1={pad} y1={y(0)} x2={W - pad} y2={y(0)} stroke="#2A3E4E" strokeDasharray="3 3" />
-        <path d={path} fill="none" stroke="#D6A445" strokeWidth="2" />
-        {series.map((s, i) => <circle key={s.date + i} cx={x(i)} cy={y(s.bal)} r="2.5" fill="#D6A445" />)}
-      </svg>
-    </section>
-  );
-}
-
 function Newsletter() {
   const [email, setEmail] = useState("");
   const [consent, setConsent] = useState(false);
@@ -329,12 +342,11 @@ function HistoricoCalendario() {
 export default function TraderSite() {
   const [picks, setPicks] = useState({});
   const [hist, setHist] = useState([]);
-  const [settings, setSettings] = useState({});
   const [openPos, setOpenPos] = useState([]);
   const [posPrices, setPosPrices] = useState({});
   useEffect(() => {
     const load = () => {
-      fetchPublished().then(setPicks); fetchHistory().then((h) => setHist(Array.isArray(h) ? h : [])); fetchSettings().then(setSettings);
+      fetchPublished().then(setPicks); fetchHistory().then((h) => setHist(Array.isArray(h) ? h : []));
       fetchPositions().then((p) => { const a = Array.isArray(p) ? p : []; setOpenPos(a); fetchPrices(a.map((x) => x.ticker)).then(setPosPrices); });
     };
     load();
@@ -354,11 +366,11 @@ export default function TraderSite() {
     const acerto = pred.length ? Math.round(hits / pred.length * 100) : null;
     return { n, subiu, avgPct, acerto };
   }, [hist]);
-  const totalPL = Number(settings.totalPL) || 0; // Total L/P real do DEGIRO (€, definido no admin)
-  const saldo = Number(settings.saldo) || 0; // Saldo da conta DEGIRO (€)
-  const diaPL = settings.diaPL != null ? Number(settings.diaPL) : null; // Dia L/P (€)
-  const carteira = settings.carteira != null ? Number(settings.carteira) : null; // posições abertas (€)
-  const plPer = [["pl3d", "3 dias"], ["pl7d", "7 dias"], ["pl1m", "1 mês"]].map(([k, l]) => ({ l, v: settings[k] != null ? Number(settings[k]) : null })).filter((x) => x.v != null); // L/P por período
+  const totalPL = hist.reduce((a, r) => a + (Number(r.pnl) || 0), 0); // resultado total = soma de todos os trades do histórico
+  // L/P por período — soma automática dos ganhos do histórico por janela de data
+  const plPer = hist.length ? [["3 dias", 3], ["7 dias", 7], ["1 mês", 30]].map(([l, d]) => ({
+    l, v: hist.reduce((a, r) => { const age = r.date ? daysBetween(r.date) : 1e9; return age >= 0 && age <= d ? a + (Number(r.pnl) || 0) : a; }, 0),
+  })) : [];
   // suspenso: há posição aberta submersa (abaixo do preço) → capital preso → previsões suspensas
   const submersas = useMemo(() => openPos.filter((p) => { const c = posPrices[p.ticker]; return c != null && c < p.buyPrice; }), [openPos, posPrices]);
   const suspenso = submersas.length > 0;
@@ -410,10 +422,7 @@ export default function TraderSite() {
           <div className="ts-stat"><b style={{ color: "#D6A445" }}>{stats.acerto != null ? stats.acerto + "%" : "—"}</b><span>acerto das previsões</span><small>previu a direção certa</small></div>
           <div className="ts-stat"><b>{stats.n}</b><span>resultados analisados</span><small>apresentações no histórico</small></div>
           <div className="ts-stat"><b>{stats.subiu}%</b><span>que subiram</span><small>subiram nos resultados</small></div>
-          <div className="ts-stat"><b style={{ color: totalPL >= 0 ? "#2FA37A" : "#C8553D" }}>{totalPL >= 0 ? "+" : ""}{eur(totalPL)}</b><span>resultado total (DEGIRO)</span><small>média {stats.avgPct >= 0 ? "+" : ""}{stats.avgPct.toFixed(1)}%/trade</small></div>
-          {saldo !== 0 && <div className="ts-stat"><b>{eur(saldo)}</b><span>saldo da conta</span><small>capital atual (DEGIRO)</small></div>}
-          {diaPL != null && <div className="ts-stat"><b style={{ color: diaPL > 0 ? "#2FA37A" : diaPL < 0 ? "#C8553D" : "var(--tx)" }}>{diaPL >= 0 ? "+" : ""}{eur(diaPL)}</b><span>dia L/P</span><small>ganho/perda do dia</small></div>}
-          {carteira != null && <div className="ts-stat"><b>{eur(carteira)}</b><span>posições abertas</span><small>valor em carteira</small></div>}
+          <div className="ts-stat"><b style={{ color: totalPL >= 0 ? "#2FA37A" : "#C8553D" }}>{totalPL >= 0 ? "+" : ""}{eur(totalPL)}</b><span>resultado total</span><small>soma dos trades · média {stats.avgPct >= 0 ? "+" : ""}{stats.avgPct.toFixed(1)}%/trade</small></div>
           {plPer.map((p) => <div className="ts-stat" key={p.l}><b style={{ color: p.v > 0 ? "#2FA37A" : p.v < 0 ? "#C8553D" : "var(--tx)" }}>{p.v >= 0 ? "+" : ""}{eur(p.v)}</b><span>L/P {p.l}</span><small>ganho/perda no período</small></div>)}
         </div>
         <div className="ts-note">Resultados passados não garantem futuros. Não é aconselhamento financeiro; é análise probabilística assistida por IA.</div>
@@ -430,8 +439,6 @@ export default function TraderSite() {
       </section>
 
       <Positions />
-
-      <Evolucao />
 
       <section id="site-gal" className="ts-sec">
         <h2>Galeria de earnings</h2>
@@ -457,11 +464,11 @@ export default function TraderSite() {
 
       <section id="site-premium" className="ts-sec ts-prem">
         <h2>Área premium</h2>
-        <p className="ts-lead">Acesso à recomendação COMPRAR/NÃO por ação, valor esperado, gap histórico e alertas de entrada.</p>
+        <p className="ts-lead">Acesso à probabilidade (subir/descer) por ação, valor esperado, gap histórico e alertas de entrada. Não é recomendação.</p>
         <div className="ts-premcard">
           <div className="ts-premprice">Em breve</div>
           <ul>
-            <li>✓ Previsão COMPRAR/NÃO detalhada</li>
+            <li>✓ Probabilidade (subir/descer) detalhada</li>
             <li>✓ Valor esperado + gap overnight por ação</li>
             <li>✓ Alertas da hora de entrada</li>
             <li>✓ Track record atualizado</li>
@@ -534,19 +541,18 @@ const CSS = `
 .ts-ftname{color:var(--mut);font-size:12px;margin-top:2px;}
 .ts-ftnote{font-size:13px;margin-top:8px;font-style:italic;color:var(--tx);}
 .ts-ftmeta{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--mut);margin-top:8px;}
+.ts-feat.clik{cursor:pointer;}
+.ts-mono{display:inline-flex;align-items:center;justify-content:center;width:26px;height:20px;border-radius:5px;color:#0E1620;font-size:9.5px;font-weight:700;font-family:'IBM Plex Mono',monospace;vertical-align:middle;letter-spacing:-.02em;}
+.ts-ftsect{margin-left:8px;font-size:10px;color:var(--mut);border:1px solid var(--line);border-radius:5px;padding:1px 6px;text-transform:capitalize;}
+.ts-spark{width:100%;height:70px;background:var(--ink);border:1px solid var(--line);border-radius:8px;margin-bottom:6px;}
+.ts-ftana{display:flex;gap:12px;flex-wrap:wrap;margin-top:8px;font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--mut);}
+.ts-ftana b{color:var(--tx);}
+.ts-ftdet{margin-top:10px;border-top:1px solid var(--line);padding-top:10px;display:flex;flex-direction:column;gap:6px;}
+.ts-ftdet>div{display:flex;justify-content:space-between;font-size:12.5px;color:var(--mut);}
+.ts-ftdet>div b{color:var(--tx);font-family:'IBM Plex Mono',monospace;}
+.ts-ftwarn{display:block!important;color:#f0d9a8;font-size:11px;line-height:1.4;background:rgba(214,164,69,.1);border-radius:6px;padding:8px;margin-top:4px;}
 .ts-pbadge{color:#0E1620;font-weight:700;font-size:10.5px;padding:1px 7px;border-radius:5px;font-family:'IBM Plex Mono',monospace;}
 .ts-aitag{font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:var(--gold);border:1px solid var(--gold);border-radius:4px;padding:0 4px;vertical-align:middle;letter-spacing:.05em;}
-.ts-rtbl{display:flex;flex-direction:column;gap:2px;background:var(--s1);border:1px solid var(--line);border-radius:12px;overflow:hidden;}
-.ts-rrow{display:grid;grid-template-columns:1.6fr 1.3fr .7fr .9fr;gap:10px;align-items:center;padding:11px 14px;border-bottom:1px solid var(--line);border-left:3px solid transparent;font-size:13.5px;}
-.ts-rrow:last-child{border-bottom:none;}
-.ts-rhead{color:var(--mut);font-size:11px;text-transform:uppercase;letter-spacing:.05em;background:rgba(255,255,255,.02);}
-.ts-rtic{font-family:'Space Grotesk',sans-serif;font-weight:700;display:flex;flex-direction:column;}.ts-rtic em{font-style:normal;font-weight:400;font-size:11px;color:var(--mut);}
-.ts-rprice{font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--mut);}
-.ts-trades{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;}
-.ts-trade{background:var(--s1);border:1px solid var(--line);border-left:3px solid;border-radius:10px;padding:12px 14px;}
-.ts-tt{font-family:'Space Grotesk',sans-serif;font-weight:700;}.ts-tt span{font-weight:400;font-size:12px;color:var(--mut);}
-.ts-tp{font-family:'IBM Plex Mono',monospace;font-size:16px;margin:4px 0;}
-.ts-tprice{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--mut);}
 .ts-note{margin-top:16px;background:rgba(214,164,69,.1);border:1px solid var(--line);border-radius:10px;padding:12px 14px;font-size:12.5px;color:#f0d9a8;line-height:1.5;}
 .ts-herocta{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-bottom:14px;}
 .ts-btnghost{background:transparent!important;color:var(--gold)!important;border:1px solid var(--gold);}
@@ -554,17 +560,6 @@ const CSS = `
 .ts-step{background:var(--s1);border:1px solid var(--line);border-radius:12px;padding:16px;display:flex;gap:12px;}
 .ts-stepn{flex:0 0 34px;height:34px;border-radius:50%;background:var(--gold);color:#1a1206;font-family:'Space Grotesk',sans-serif;font-weight:700;display:flex;align-items:center;justify-content:center;}
 .ts-step b{font-family:'Space Grotesk',sans-serif;}.ts-step p{color:var(--mut);font-size:13px;line-height:1.5;margin:4px 0 0;}
-.ts-calc{display:flex;gap:18px;flex-wrap:wrap;align-items:center;background:var(--s1);border:1px solid var(--line);border-radius:12px;padding:18px;}
-.ts-calcin{display:flex;gap:14px;flex-wrap:wrap;flex:1;}
-.ts-calcin label{display:flex;flex-direction:column;font-size:12px;color:var(--mut);gap:4px;}
-.ts-calcin input{background:var(--ink);color:var(--tx);border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:15px;width:130px;font-family:'IBM Plex Mono',monospace;}
-.ts-calcout{display:flex;gap:22px;}
-.ts-calcout div{display:flex;flex-direction:column;}.ts-calcout span{font-size:11px;color:var(--mut);text-transform:uppercase;letter-spacing:.08em;}
-.ts-calcout b{font-family:'IBM Plex Mono',monospace;font-size:24px;}
-.ts-evostats{display:flex;gap:26px;flex-wrap:wrap;margin-bottom:14px;}
-.ts-evostats div{display:flex;flex-direction:column;}.ts-evostats span{font-size:11px;color:var(--mut);text-transform:uppercase;letter-spacing:.08em;}
-.ts-evostats b{font-family:'IBM Plex Mono',monospace;font-size:20px;}
-.ts-evochart{width:100%;height:auto;background:var(--s1);border:1px solid var(--line);border-radius:12px;}
 .ts-news{display:flex;gap:10px;flex-wrap:wrap;max-width:460px;}
 .ts-news input{flex:1;min-width:200px;background:var(--s1);color:var(--tx);border:1px solid var(--line);border-radius:9px;padding:11px 14px;font-size:15px;}
 .ts-consent{display:flex;gap:8px;align-items:flex-start;font-size:12px;color:var(--mut);margin-top:10px;max-width:520px;line-height:1.4;}
