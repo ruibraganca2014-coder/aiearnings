@@ -423,6 +423,8 @@ export default function EarningsEdge() {
       targetUpside: item.targetUpside ?? null, price: item.price ?? null,
       history: item.history || null, earningsMarks: item.earningsMarks || null,
       sector: item.sector || cur.sector || "",
+      signals: item.lean?.signals || cur.signals || null,   // sinais fundamentais (beat, revisões, valuation, qualidade)
+      reactions: Array.isArray(item.reactions) ? item.reactions : (cur.reactions || null), // drifts passados (PEAD)
       nota: cur.nota || item.llm?.reasoning || "",
       // pesquisa aprofundada (texto das 5 análises) — só o texto, para mostrar no site
       research: (() => {

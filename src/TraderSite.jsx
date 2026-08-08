@@ -87,6 +87,14 @@ function TickerTape({ items }) {
 }
 
 const RESEARCH_LABELS = { financial: "Análise financeira", equity: "Análise de ações", earnings: "Revisão de resultados", market: "Análise de mercado", government: "Contratos & governo" };
+const THEME_LABELS = { ai: "IA & Software", cloud: "Cloud", cyber: "Cibersegurança", semis: "Semicondutores", memory: "Memória", datacenter: "Data centers", networking: "Redes", storage: "Armazenamento", finance: "Finanças", crypto: "Cripto", health: "Saúde", consumer: "Consumo", powergrid: "Energia", industrial: "Industrial", defense: "Defesa & Espaço", ev: "Veículos elétricos", solar: "Solar", minerals: "Minerais", gaming: "Media & Gaming" };
+// mini-barra -1..+1 (sinais) ou centrada em 0 (reações %)
+function SigBar({ v, max = 1 }) {
+  const pct = Math.max(-1, Math.min(1, v / max));
+  const w = Math.abs(pct) * 50;
+  const col = pct >= 0 ? "#2FA37A" : "#C8553D";
+  return <span className="ts-sigbar"><span className="ts-sigfill" style={{ width: w + "%", left: pct >= 0 ? "50%" : (50 - w) + "%", background: col }} /></span>;
+}
 
 // Modal de detalhe (abre ao clicar 2× numa ação). Mostra métricas + gráfico + pesquisa aprofundada.
 export function StockModal({ pick, onClose }) {
@@ -152,7 +160,7 @@ function TraderPick({ pick, onDetail }) {
         </div>
         <div className="ts-tpbody">
           <div className="ts-tpleft">
-            <div className="ts-tptop"><Mono ticker={p.ticker} sector={p.sector} /><div><div className="ts-tptic">{p.ticker} <span className="ts-aitag">IA</span></div><div className="ts-tpname">{p.name}{p.sector && p.sector !== "other" && <span className="ts-ftsect">{p.sector}</span>}</div></div></div>
+            <div className="ts-tptop"><Mono ticker={p.ticker} sector={p.sector} /><div><div className="ts-tptic">{p.ticker} <span className="ts-aitag">IA</span>{p.sector && THEME_LABELS[p.sector] && <span className="ts-themetag">{THEME_LABELS[p.sector]}</span>}</div><div className="ts-tpname">{p.name}</div></div></div>
             {p.nota && <div className="ts-tpnota">“{p.nota}”</div>}
             <div className="ts-tpmetrics">
               {p.probUp != null && <div><span>Prob. subir</span><b style={{ color: probColor(p.probUp) }}>{p.probUp}%</b></div>}
@@ -164,6 +172,23 @@ function TraderPick({ pick, onDetail }) {
           </div>
           {p.history && p.history.length > 1 && <div className="ts-tpchart"><Spark hist={p.history} marks={p.earningsMarks} /></div>}
         </div>
+
+        {(p.signals?.length || p.reactions?.length) && (
+          <div className="ts-tpsig" onClick={(e) => e.stopPropagation()}>
+            <div className="ts-tpsighint">⚠ Sinais = leitura de incerteza, não previsão. A direção nos resultados é quase <b>moeda ao ar</b> — sem edge provado (backtest ~48%).</div>
+            {p.signals?.length > 0 && (
+              <div className="ts-tpsiggrid">
+                {p.signals.map((s) => <div key={s.key} className="ts-tpsigrow"><span className="ts-tpsigl">{s.label}</span><SigBar v={s.v} /><em>{s.raw}</em></div>)}
+              </div>
+            )}
+            {p.reactions?.length > 0 && (
+              <div className="ts-tpreac">
+                <span className="ts-tpsiglbl">Reações passadas nos resultados (drift ~1 mês):</span>
+                <div className="ts-tpreacbars">{p.reactions.map((r, i) => <span key={i} className="ts-tpreacbar" title={(r >= 0 ? "+" : "") + r + "%"}><span style={{ height: Math.min(100, Math.abs(r) * 3) + "%", background: r >= 0 ? "#2FA37A" : "#C8553D" }} /></span>)}</div>
+              </div>
+            )}
+          </div>
+        )}
         {rTypes.length > 0 && (
           <div className="ts-tpresearch" onClick={(e) => e.stopPropagation()}>
             <div className="ts-tprtabs">
@@ -931,6 +956,22 @@ export const CSS = `
 .ts-mmetric b{font-family:'IBM Plex Mono',monospace;font-size:16px;}
 .ts-modalfoot{margin-top:14px;padding-top:12px;border-top:1px solid var(--line);font-size:13px;}
 .ts-modalfoot a{color:var(--gold);text-decoration:none;font-weight:600;}
+/* card: tema + sinais + reações */
+.ts-themetag{font-size:10.5px;background:var(--s2);border:1px solid var(--line);border-radius:20px;padding:2px 9px;color:var(--mut);margin-left:8px;vertical-align:middle;}
+.ts-tpsig{margin-top:14px;padding-top:12px;border-top:1px solid var(--line);}
+.ts-tpsighint{font-size:12px;color:#f0d9a8;background:rgba(214,164,69,.08);border:1px solid var(--line);border-radius:8px;padding:8px 11px;margin-bottom:10px;line-height:1.5;}
+.ts-tpsiggrid{display:grid;grid-template-columns:1fr 1fr;gap:8px 22px;}
+@media(max-width:640px){.ts-tpsiggrid{grid-template-columns:1fr;}}
+.ts-tpsigrow{display:grid;grid-template-columns:1fr 70px auto;align-items:center;gap:8px;font-size:12px;}
+.ts-tpsigl{color:var(--mut);}
+.ts-tpsigrow em{font-style:normal;font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--tx);white-space:nowrap;}
+.ts-sigbar{position:relative;display:inline-block;width:70px;height:6px;background:var(--s2);border-radius:3px;overflow:hidden;}
+.ts-sigfill{position:absolute;top:0;height:100%;border-radius:3px;}
+.ts-tpreac{margin-top:12px;}
+.ts-tpsiglbl{display:block;font-size:11.5px;color:var(--mut);margin-bottom:6px;}
+.ts-tpreacbars{display:flex;align-items:flex-end;gap:3px;height:44px;}
+.ts-tpreacbar{flex:1;max-width:22px;height:100%;display:flex;align-items:flex-end;background:var(--s2);border-radius:3px;overflow:hidden;}
+.ts-tpreacbar>span{display:block;width:100%;border-radius:3px;}
 @media(max-width:620px){.ts-tpchart{width:100%;}}
 /* método: timeline + regras + exemplo + stats + aviso */
 .ts-tl{display:flex;align-items:stretch;gap:8px;margin:22px 0;flex-wrap:wrap;}

@@ -295,6 +295,7 @@ function DestaqueAdmin({ token, onAuthFail }) {
         impliedMove: q.impliedMove ?? null, gapAvg: q.gapAvg ?? null, gapPctUp: q.gapPctUp ?? null, momentum: q.momentum ?? null,
         rsi: q.rsi ?? null, analyst: q.analyst || "", beatRate: q.beatRate ?? null, targetUpside: q.targetUpside ?? null, price: q.price ?? null,
         history: q.history || null, earningsMarks: q.earningsMarks || null, sector: q.sector || all[key].sector || "", research,
+        signals: q.lean?.signals || null, reactions: Array.isArray(q.reactions) ? q.reactions : null,
       };
       await savePicks(token, all);
       setPicks(all); setSaved(true);
