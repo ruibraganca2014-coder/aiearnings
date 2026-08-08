@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useRef } from "react";
-import { FEATURED_MAX, canFeature } from "./src/shared.js";
+import { FEATURED_MAX, canFeature, CHART_RANGES, rangePoints, axisTicks } from "./src/shared.js";
 
 // ---------- helpers ----------
 const clamp = (x, lo, hi) => Math.max(lo, Math.min(hi, x));
@@ -1222,15 +1222,14 @@ function AnalysisBlock({ item }) {
   );
 }
 
-// Gráfico de cotações (linha do fecho) com períodos Ano/Mês/Semana e marcas nas datas de resultados.
+// Gráfico de cotações (linha do fecho) com vários períodos, eixos X/Y e marcas nas datas de resultados.
 function PriceChart({ item }) {
   const hist = item.history || [];
-  const [per, setPer] = useState("ano");
+  const [per, setPer] = useState("1a");
   if (hist.length < 2) return null;
-  const n = per === "semana" ? 6 : per === "mes" ? 22 : 260;
-  const data = hist.slice(-n);
+  const data = hist.slice(-rangePoints(per));
   if (data.length < 2) return null;
-  const W = 640, H = 170, padL = 6, padR = 6, padT = 8, padB = 8;
+  const W = 660, H = 210, padL = 46, padR = 10, padT = 10, padB = 26; // gutters p/ eixos
   const cs = data.map((x) => x.c);
   const min = Math.min(...cs), max = Math.max(...cs), rng = max - min || 1;
   const X = (i) => padL + (i / (data.length - 1)) * (W - padL - padR);
@@ -1241,19 +1240,34 @@ function PriceChart({ item }) {
   const col = chg >= 0 ? "#2FA37A" : "#C8553D";
   const idxByDate = (d) => { let b = -1; for (let i = 0; i < data.length; i++) { if (data[i].d <= d) b = i; else break; } return b; };
   const marks = (item.earningsMarks || []).filter((d) => d >= first.d && d <= last.d).map(idxByDate).filter((i) => i >= 0);
+  const yTicks = axisTicks(min, max, 5);                       // valores do eixo Y (preço)
+  const nX = Math.min(6, data.length);                         // ~6 datas no eixo X
+  const xTicks = Array.from({ length: nX }, (_, k) => Math.round((k * (data.length - 1)) / (nX - 1)));
   return (
     <div className="ee-pchart">
       <div className="ee-pchart-head">
         <span className="ee-pchart-title">Cotação {chg >= 0 ? "▲" : "▼"} <b style={{ color: col }}>{chg >= 0 ? "+" : ""}{chg.toFixed(1)}%</b> · {min.toFixed(1)}–{max.toFixed(1)}</span>
         <span className="ee-pchart-btns">
-          {[["semana", "Semana"], ["mes", "Mês"], ["ano", "Ano"]].map(([k, l]) => (
+          {CHART_RANGES.map(([k, l]) => (
             <button key={k} className={"ee-pchart-b" + (per === k ? " on" : "")} onClick={() => setPer(k)}>{l}</button>
           ))}
         </span>
       </div>
-      <svg className="ee-pchart-svg" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" role="img" aria-label="Cotação">
-        {marks.map((i, k) => <line key={k} x1={X(i)} y1={padT} x2={X(i)} y2={H - padB} stroke="#E0A33E" strokeWidth="1" strokeDasharray="2 3" opacity="0.6" />)}
-        <path d={path} fill="none" stroke={col} strokeWidth="1.5" vectorEffect="non-scaling-stroke" />
+      <svg className="ee-pchart-svg" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="xMidYMid meet" role="img" aria-label="Cotação">
+        {/* eixo Y: linhas de grelha + valores de preço */}
+        {yTicks.map((v, k) => { const y = Y(v); return (
+          <g key={"y" + k}>
+            <line x1={padL} y1={y} x2={W - padR} y2={y} stroke="#2A3E4E" strokeWidth="0.5" opacity="0.6" />
+            <text x={padL - 6} y={y + 3} textAnchor="end" fontSize="9" fill="#8CA3B3" fontFamily="'IBM Plex Mono',monospace">{v.toFixed(1)}</text>
+          </g>
+        ); })}
+        {/* eixo X: datas */}
+        {xTicks.map((i, k) => (
+          <text key={"x" + k} x={X(i)} y={H - padB + 14} textAnchor={k === 0 ? "start" : k === xTicks.length - 1 ? "end" : "middle"} fontSize="9" fill="#8CA3B3" fontFamily="'IBM Plex Mono',monospace">{fmtDay(data[i].d)}</text>
+        ))}
+        {/* marcas de resultados */}
+        {marks.map((i, k) => <line key={"m" + k} x1={X(i)} y1={padT} x2={X(i)} y2={H - padB} stroke="#E0A33E" strokeWidth="1" strokeDasharray="2 3" opacity="0.6" />)}
+        <path d={path} fill="none" stroke={col} strokeWidth="1.5" />
         <circle cx={X(data.length - 1)} cy={Y(last.c)} r="3.5" fill={col} />
       </svg>
       <div className="ee-pchart-foot">{fmtDay(first.d)} → {fmtDay(last.d)} · linhas ⃒ tracejadas = datas de resultados</div>
@@ -1892,11 +1906,11 @@ const CSS = `
 .ee-pchart{margin-bottom:14px;border:1px solid var(--line);border-radius:10px;padding:12px;background:var(--ink);}
 .ee-pchart-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:8px;}
 .ee-pchart-title{font-size:12.5px;color:var(--muted);}
-.ee-pchart-btns{display:flex;gap:4px;}
-.ee-pchart-b{background:none;border:1px solid var(--line);color:var(--muted);border-radius:6px;padding:2px 9px;font-size:11px;cursor:pointer;font-family:'IBM Plex Mono',monospace;}
+.ee-pchart-btns{display:flex;gap:4px;flex-wrap:wrap;justify-content:flex-end;}
+.ee-pchart-b{background:none;border:1px solid var(--line);color:var(--muted);border-radius:6px;padding:2px 8px;font-size:11px;cursor:pointer;font-family:'IBM Plex Mono',monospace;}
 .ee-pchart-b:hover{color:var(--text);}
 .ee-pchart-b.on{color:var(--gold);border-color:var(--gold);}
-.ee-pchart-svg{width:100%;height:170px;display:block;}
+.ee-pchart-svg{width:100%;height:auto;display:block;}
 .ee-pchart-foot{font-size:10.5px;color:var(--muted);margin-top:6px;}
 .ee-gap{margin-bottom:14px;border:1px solid var(--line);border-radius:10px;padding:14px;background:var(--ink);}
 .ee-gap-h{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:13.5px;margin-bottom:4px;flex-wrap:wrap;}
