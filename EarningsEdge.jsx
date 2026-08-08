@@ -329,8 +329,8 @@ async function fetchCalendar(fromISO, toISO) {
   const arr = await res.json();
   if (!res.ok || arr.error) throw new Error(arr.error || `erro ${res.status}`);
   if (!Array.isArray(arr)) throw new Error("resposta inválida");
-  // mantém próximos (dentro da janela) + resultados passados já verificados
-  return arr.filter((x) => x.past || (x.date >= fromISO && x.date <= toISO));
+  // só EUA (descarta sufixo de bolsa estrangeira) + próximos na janela / passados verificados
+  return arr.filter((x) => !/\.[A-Z]+$/.test(String(x.ticker || "")) && (x.past || (x.date >= fromISO && x.date <= toISO)));
 }
 
 const RESEARCH_META = {
@@ -394,14 +394,84 @@ export default function EarningsEdge() {
     try {
       const arr = await fetchCalendar(window15d.from, window15d.to);
       setCalendar(arr);
+      return arr;
     } catch (e) {
       setCalErr(`Não consegui carregar o calendário (${e.message}).`);
+      return [];
     } finally {
       setCalLoading(false);
     }
   };
 
   useEffect(() => { loadCalendar(); }, []); // eslint-disable-line
+
+  // ---- AUTO (Fast Run 1-clique): analisa próximos 7 dias → publica em Previsões (com balões) → 5 pesquisas ----
+  const [autoMsg, setAutoMsg] = useState("");
+  const [autoRunning, setAutoRunning] = useState(false);
+  const pickFromItem = (item, cal, cur = {}) => {
+    const ev = evVerdict(item).ev;
+    return {
+      ...cur,
+      ticker: item.ticker, name: item.name || cur.name || item.ticker,
+      exch: exchLabel(item.ticker), date: cal?.date || cur.date, entryISO: cal?.entryISO || cal?.date || cur.entryISO, when: cal?.when || cur.when,
+      show: true,
+      probUp: item.llm?.probUp ?? item.lean?.probUp ?? null,
+      confidence: item.llm?.confidence ?? item.lean?.confidence ?? null,
+      ev: ev != null ? Math.round(ev * 100) / 100 : null,
+      impliedMove: item.impliedMove ?? null, gapAvg: item.gapAvg ?? null, gapPctUp: item.gapPctUp ?? null, gapUp: item.gapPctUp ?? null,
+      momentum: item.momentum ?? null, rsi: item.rsi ?? null, analyst: item.analyst || "", beatRate: item.beatRate ?? null,
+      targetUpside: item.targetUpside ?? null, price: item.price ?? null,
+      history: item.history || null, earningsMarks: item.earningsMarks || null,
+      sector: item.sector || cur.sector || "",
+      nota: cur.nota || item.llm?.reasoning || "",
+    };
+  };
+  const autoWeek = async (arr) => {
+    const token = localStorage.getItem("ee_admin_token");
+    if (!token) { setAutoMsg("Faz login primeiro."); return; }
+    // mesmas próximas ações que o site mostra (Featured/Previsões usam slice(0,8))
+    const seen = new Set(), up7 = [];
+    for (const x of (arr || []).filter((x) => !x.past).sort((a, b) => (a.entryISO || a.date || "").localeCompare(b.entryISO || b.date || ""))) {
+      if (!seen.has(x.ticker)) { seen.add(x.ticker); up7.push(x); }
+      if (up7.length >= 8) break;
+    }
+    if (!up7.length) { setAutoMsg("Sem próximos resultados."); return; }
+    setAutoRunning(true);
+    setSelected(new Set(up7.map((x) => x.ticker)));
+    // 1) analisar (pool de 4) — enche prob/EV/gap/gráfico
+    const items = []; let i = 0;
+    setAutoMsg(`a analisar 0/${up7.length}…`);
+    const aworker = async () => {
+      while (i < up7.length) {
+        const cal = up7[i++];
+        try {
+          const dd = await fetchTicker(cal.ticker, { llm: true });
+          const it = toItem(dd, Date.now() + Math.random(), null, false); it._cal = cal;
+          items.push(it);
+          setResults((r) => [it, ...r.filter((x) => x.ticker !== it.ticker)]);
+        } catch (_) {}
+        setAutoMsg(`a analisar ${items.length}/${up7.length}…`);
+      }
+    };
+    await Promise.all(Array.from({ length: 4 }, aworker));
+    // 2) publicar em Previsões desta semana (refresh: só os desta semana ficam show)
+    try {
+      const all = await (await fetch("/api/picks/all", { cache: "no-store", headers: { Authorization: "Bearer " + token } })).json();
+      for (const k in all) all[k] = { ...all[k], show: false };
+      for (const it of items) all[it.ticker] = pickFromItem(it, it._cal, all[it.ticker] || {});
+      await fetch("/api/picks", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + token }, body: JSON.stringify({ picks: all }) });
+      setAutoMsg(`publicado ${items.length} em Previsões · a correr pesquisa aprofundada…`);
+    } catch (_) { setAutoMsg("falha ao publicar picks."); }
+    // 3) pesquisa aprofundada: 5 análises por ação (pool de 4)
+    const types = ["financial", "equity", "earnings", "market", "government"];
+    const jobs = []; for (const it of items) for (const ty of types) jobs.push({ it, ty });
+    let j = 0;
+    const rworker = async () => { while (j < jobs.length) { const { it, ty } = jobs[j++]; try { await runResearch(it, ty); } catch (_) {} } };
+    await Promise.all(Array.from({ length: 4 }, rworker));
+    setAutoMsg(`✓ ${items.length} ações: analisadas, publicadas em Previsões e pesquisadas. (Histórico mostra os últimos 7 dias automaticamente.)`);
+    setAutoRunning(false);
+  };
+  const atualizarTudo = async () => { const arr = await loadCalendar(); await autoWeek(arr); };
 
   // passados: bloco próprio, mais recente primeiro. próximos: agrupados por mês.
   const pastRows = useMemo(
@@ -572,10 +642,11 @@ export default function EarningsEdge() {
       <section className="ee-cal">
         <div className="ee-cal-head">
           <h2 className="ee-cal-title">Próximos resultados · 30 dias</h2>
-          <button className="ee-cal-refresh" onClick={loadCalendar} disabled={calLoading}>
-            {calLoading ? "a carregar…" : "↻ atualizar"}
+          <button className="ee-cal-refresh" onClick={atualizarTudo} disabled={calLoading || autoRunning}>
+            {calLoading ? "a carregar…" : autoRunning ? "a processar…" : "↻ atualizar tudo"}
           </button>
         </div>
+        {autoMsg && <div className="ee-auto-msg">{autoRunning ? "⏳ " : ""}{autoMsg}</div>}
 
         <button className="ee-legend-toggle" onClick={() => setShowLegend((s) => !s)}>
           {showLegend ? "▾ esconder áreas" : "▸ ver áreas"}
@@ -1595,6 +1666,7 @@ const CSS = `
 .ee-cal-reac{font-variant-numeric:tabular-nums;}
 .ee-cal-hit{font-weight:600;}
 .ee-cal-empty{color:var(--muted);font-size:13px;padding:12px 0;}
+.ee-auto-msg{background:rgba(214,164,69,.10);border:1px solid var(--line);border-radius:8px;padding:9px 12px;font-size:12.5px;color:#f0d9a8;margin:8px 0;}
 .ee-cal-foot{font-size:11px;color:var(--muted);line-height:1.5;margin-top:10px;border-top:1px solid var(--line);padding-top:10px;}
 .ee-inline-retry{background:none;border:none;color:var(--gold);text-decoration:underline;cursor:pointer;font-size:inherit;}
 .ee-error{background:rgba(200,85,61,.12);border:1px solid #C8553D;color:#f0b8ab;border-radius:10px;padding:12px 14px;font-size:13.5px;margin-bottom:14px;line-height:1.5;}

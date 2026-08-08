@@ -1,7 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import EarningsEdge from "../EarningsEdge.jsx";
-import { getToken, setToken, clearToken, fetchAll, savePicks, login, fetchPositions, savePositions, fetchPrices, daysBetween, fetchHistory, saveHistory, extractDoc, fetchTrades, saveTrades, fetchEmails, fetchSettings, saveSettings, uploadLedger } from "./picks.js";
-import { TRADES } from "./trades.js";
+import { getToken, setToken, clearToken, fetchAll, savePicks, login, fetchPositions, savePositions, fetchPrices, daysBetween, fetchHistory, saveHistory, extractDoc, fetchEmails, fetchSettings, saveSettings, uploadLedger } from "./picks.js";
 import { WD, exchOf, fmtDay } from "./shared.js";
 
 const emptyRec = () => ({ type: "reaction", ticker: "", name: "", date: new Date().toISOString().slice(0, 10), pct: "", pnl: "", predicted: "SUBIR", probUp: "", nota: "" });
@@ -91,62 +90,6 @@ function PositionsAdmin({ token, onAuthFail }) {
           </tbody>
         </table>
       )}
-    </div>
-  );
-}
-
-function TradesAdmin({ token, onAuthFail }) {
-  const [trades, setTrades] = useState(null);
-  const [f, setF] = useState({ t: "", name: "", buy: "", sell: "", pnl: "" });
-  const [saved, setSaved] = useState(true);
-
-  useEffect(() => { fetchTrades().then((a) => setTrades(Array.isArray(a) ? a : TRADES)); }, []); // [] = ficheiro limpo; null = ainda sem ficheiro → mostra os default para editares
-
-  const persist = (next) => {
-    setTrades(next); setSaved(false);
-    saveTrades(token, next).then(() => setSaved(true)).catch((e) => { if (String(e.message) === "401") onAuthFail(); });
-  };
-  const add = () => {
-    const buy = parseFloat(f.buy), sell = parseFloat(f.sell);
-    if (!f.t || !buy || !sell) return;
-    const pct = +(((sell - buy) / buy) * 100).toFixed(1);
-    persist([...(trades || []), { t: f.t.toUpperCase().trim(), name: f.name.trim() || f.t.toUpperCase(), buy, sell, pct, pnl: f.pnl === "" ? 0 : Number(f.pnl) }]);
-    setF({ t: "", name: "", buy: "", sell: "", pnl: "" });
-  };
-  const remove = (i) => persist(trades.filter((_, j) => j !== i));
-
-  if (!trades) return <div className="ad-muted">A carregar…</div>;
-  const wins = trades.filter((t) => t.pnl > 0).length;
-  const total = Math.round(trades.reduce((a, t) => a + (t.pnl || 0), 0));
-
-  return (
-    <div>
-      <div className="ad-bar">Track record real · <b>{trades.length}</b> trades · {wins} positivos · total <b style={{ color: total >= 0 ? "#2FA37A" : "#C8553D" }}>{total >= 0 ? "+$" : "-$"}{Math.abs(total)}</b> · <span style={{ color: saved ? "#2FA37A" : "#D6A445" }}>{saved ? "✓ guardado" : "a guardar…"}</span></div>
-
-      <div className="ad-form">
-        <input className="ad-note" style={{ maxWidth: 80 }} placeholder="TICKER" value={f.t} onChange={(e) => setF({ ...f, t: e.target.value })} />
-        <input className="ad-note" placeholder="nome" value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} />
-        <input className="ad-note" style={{ maxWidth: 100 }} type="number" step="0.01" placeholder="compra $" value={f.buy} onChange={(e) => setF({ ...f, buy: e.target.value })} />
-        <input className="ad-note" style={{ maxWidth: 100 }} type="number" step="0.01" placeholder="venda $" value={f.sell} onChange={(e) => setF({ ...f, sell: e.target.value })} />
-        <input className="ad-note" style={{ maxWidth: 100 }} type="number" placeholder="lucro $" value={f.pnl} onChange={(e) => setF({ ...f, pnl: e.target.value })} />
-        <button className="ad-btn sm" onClick={add}>＋ Adicionar</button>
-      </div>
-
-      <table className="ad-tbl">
-        <thead><tr><th>Ticker</th><th>Compra→Venda</th><th>%</th><th>Lucro €/$</th><th></th></tr></thead>
-        <tbody>
-          {trades.map((t, i) => (
-            <tr key={t.t + i}>
-              <td className="ad-tk">{t.t}<div className="ad-nm">{t.name}</div></td>
-              <td style={{ fontFamily: "'IBM Plex Mono',monospace" }}>${t.buy} → ${t.sell}</td>
-              <td style={{ color: t.pct >= 0 ? "#2FA37A" : "#C8553D", fontFamily: "'IBM Plex Mono',monospace" }}>{t.pct >= 0 ? "+" : ""}{t.pct}%</td>
-              <td style={{ color: t.pnl >= 0 ? "#2FA37A" : "#C8553D", fontFamily: "'IBM Plex Mono',monospace" }}>{t.pnl >= 0 ? "+" : ""}{t.pnl}</td>
-              <td><button className="ad-logout" onClick={() => remove(i)}>×</button></td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-      <div className="ad-muted" style={{ marginTop: 10, fontSize: 12 }}>Estes trades aparecem no site em "Track record real".</div>
     </div>
   );
 }
@@ -419,7 +362,6 @@ export default function Admin() {
         <div className="ad-brand"><span>AI</span>earnings <em>admin</em></div>
         <div className="ad-tabs">
           <button className={tab === "pos" ? "on" : ""} onClick={() => setTab("pos")}>Posições (espera)</button>
-          <button className={tab === "trades" ? "on" : ""} onClick={() => setTab("trades")}>Trades</button>
           <button className={tab === "hist" ? "on" : ""} onClick={() => setTab("hist")}>Histórico (upload)</button>
           <button className={tab === "destaque" ? "on" : ""} onClick={() => setTab("destaque")}>★ Destaque</button>
           <button className={tab === "subs" ? "on" : ""} onClick={() => setTab("subs")}>Subscritores</button>
@@ -432,8 +374,6 @@ export default function Admin() {
       </header>
       {tab === "pos" ? (
         <div className="ad-wrap"><PositionsAdmin token={token} onAuthFail={logout} /></div>
-      ) : tab === "trades" ? (
-        <div className="ad-wrap"><TradesAdmin token={token} onAuthFail={logout} /></div>
       ) : tab === "hist" ? (
         <div className="ad-wrap"><HistoricoAdmin token={token} onAuthFail={logout} /></div>
       ) : tab === "destaque" ? (

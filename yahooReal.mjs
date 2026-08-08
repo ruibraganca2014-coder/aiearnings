@@ -574,7 +574,9 @@ async function _realCalendar(fromISO, toISO) {
   } catch { /* sem passados */ }
 
   // passados primeiro (mais recente → mais antigo), depois próximos (crescente); o frontend separa.
-  return [...past, ...upcoming.sort((a, b) => a.date.localeCompare(b.date))];
+  // só ações dos EUA: descarta tickers com sufixo de bolsa estrangeira (.AS, .DE, .MI, .PA, .L, .LS, .MC…).
+  const usOnly = (x) => !/\.[A-Z]+$/.test(String(x.ticker || ""));
+  return [...past, ...upcoming.sort((a, b) => a.date.localeCompare(b.date))].filter(usOnly);
 }
 
 // exports cacheados: quote 2 min, calendário 5 min (dedupe + poupa chamadas Yahoo)
