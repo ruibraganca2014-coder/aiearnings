@@ -102,9 +102,9 @@ const THEME_LABELS = { ai: "IA & Software", cloud: "Cloud", cyber: "Ciberseguran
 // mini-barra -1..+1 (sinais) ou centrada em 0 (reações %)
 function SigBar({ v, max = 1 }) {
   const pct = Math.max(-1, Math.min(1, v / max));
-  const w = Math.abs(pct) * 50;
+  const w = Math.abs(pct) * 100; // enche da esquerda para a direita; magnitude = comprimento, sinal = cor
   const col = pct >= 0 ? "#2FA37A" : "#C8553D";
-  return <span className="ts-sigbar"><span className="ts-sigfill" style={{ width: w + "%", left: pct >= 0 ? "50%" : (50 - w) + "%", background: col }} /></span>;
+  return <span className="ts-sigbar"><span className="ts-sigfill" style={{ width: w + "%", left: 0, background: col }} /></span>;
 }
 // célula compacta de métrica no card das Previsões (valor + barra opcional)
 function FtCell({ l, v, c, sub, fill, fillc, sig, sigmax }) {
@@ -322,7 +322,7 @@ function Predictions({ picks, suspenso, onDetail }) {
   const [err, setErr] = useState("");
   useEffect(() => {
     const from = new Date().toISOString().slice(0, 10);
-    const to = new Date(Date.now() + 7 * 864e5).toISOString().slice(0, 10); // 1 semana
+    const to = new Date(Date.now() + 8 * 864e5).toISOString().slice(0, 10); // 8 dias
     fetch(`/api/yahoo/calendar?from=${from}&to=${to}`)
       .then((r) => r.json())
       .then((a) => setRows((a || []).filter((x) => !x.past)))
@@ -896,6 +896,7 @@ export const CSS = `
 .ts-feat .ts-ftgrid .ts-ftcell:nth-child(odd){grid-column:1;}
 .ts-feat .ts-ftgrid .ts-ftcell:nth-child(even){grid-column:3;text-align:right;align-items:flex-end;}
 .ts-feat .ts-ftgrid .ts-ftcell:nth-child(even) .ts-fill{width:100%;}
+.ts-ftgrid .ts-sigbar{width:100%;}
 .ts-ftcell{display:flex;flex-direction:column;gap:2px;min-width:0;}
 .ts-ftcl{font-size:10.5px;color:var(--mut);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .ts-ftcell b{font-family:'IBM Plex Mono',monospace;font-size:14px;color:var(--tx);}
