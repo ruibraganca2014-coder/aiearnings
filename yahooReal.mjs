@@ -126,9 +126,6 @@ const UNIVERSE = {
   "D05.SI":"finance","O39.SI":"finance","U11.SI":"finance","Z74.SI":"ai","C6L.SI":"consumer",
   "7203.T":"ev","6758.T":"consumer","9984.T":"ai","6861.T":"industrial","8306.T":"finance","6501.T":"industrial","7974.T":"gaming","9432.T":"ai",
   "0700.HK":"ai","9988.HK":"ai","0939.HK":"finance","1299.HK":"finance","0005.HK":"finance","3690.HK":"consumer","1211.HK":"ev","0941.HK":"ai",
-  // Toronto (.TO) · Austrália (.AX)
-  "SHOP.TO":"cloud","RY.TO":"finance","TD.TO":"finance","ENB.TO":"powergrid","CNR.TO":"industrial","BN.TO":"finance","CNQ.TO":"powergrid",
-  "BHP.AX":"minerals","CBA.AX":"finance","CSL.AX":"health","NAB.AX":"finance","WBC.AX":"finance","FMG.AX":"minerals","WES.AX":"consumer",
 };
 
 // mapeia setor Yahoo → tema visual da app (para o ponto colorido)
