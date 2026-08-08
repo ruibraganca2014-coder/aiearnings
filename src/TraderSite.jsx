@@ -86,13 +86,69 @@ function TickerTape({ items }) {
   );
 }
 
-// Escolha do trader — a pick que o admin marcou com ★. Card grande no topo, clicável.
-function TraderPick({ pick }) {
+const RESEARCH_LABELS = { financial: "Análise financeira", equity: "Análise de ações", earnings: "Revisão de resultados", market: "Análise de mercado", government: "Contratos & governo" };
+
+// Modal de detalhe (abre ao clicar 2× numa ação). Mostra métricas + gráfico + pesquisa aprofundada.
+function StockModal({ pick, onClose }) {
+  const [rTab, setRTab] = useState(null);
+  useEffect(() => {
+    const onKey = (e) => e.key === "Escape" && onClose();
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onClose]);
   if (!pick) return null;
   const p = pick;
+  const research = p.research && typeof p.research === "object" ? p.research : null;
+  const rTypes = research ? Object.keys(RESEARCH_LABELS).filter((t) => research[t]) : [];
+  const M = ({ l, v, c }) => v == null || v === "" ? null : <div className="ts-mmetric"><span>{l}</span><b style={c ? { color: c } : undefined}>{v}</b></div>;
+  return (
+    <div className="ts-modal" onClick={onClose}>
+      <div className="ts-modalbox" onClick={(e) => e.stopPropagation()}>
+        <button className="ts-modalx" onClick={onClose}>✕</button>
+        <div className="ts-modalhd"><Mono ticker={p.ticker} sector={p.sector} /><div><div className="ts-tptic">{p.ticker} <span className="ts-aitag">IA</span></div><div className="ts-tpname">{p.name}{p.sector && p.sector !== "other" && <span className="ts-ftsect">{p.sector}</span>}</div></div>{p.probUp != null && <span className="ts-ftbadge" style={{ background: probColor(p.probUp), marginLeft: "auto" }}>↑ {p.probUp}%</span>}</div>
+        {p.nota && <div className="ts-tpnota">“{p.nota}”</div>}
+        {p.history && p.history.length > 1 && <div className="ts-tpchart" style={{ width: "100%", margin: "12px 0" }}><Spark hist={p.history} marks={p.earningsMarks} /></div>}
+        <div className="ts-mmetrics">
+          <M l="Probabilidade de subir" v={p.probUp != null ? p.probUp + "%" : null} c={probColor(p.probUp)} />
+          <M l="Valor esperado" v={p.ev != null ? (p.ev >= 0 ? "+" : "") + p.ev + "%" : null} c={p.ev >= 0 ? "#2FA37A" : "#C8553D"} />
+          <M l="Preço" v={p.price != null ? "$" + p.price : null} />
+          <M l={p.earningsDate ? "Resultados" : "Entrar"} v={(p.earningsDate || p.entryISO) ? fmtDay(p.earningsDate || p.entryISO) : null} />
+          <M l="Gap médio" v={p.gapAvg != null ? (p.gapAvg >= 0 ? "+" : "") + p.gapAvg + "%" + (p.gapPctUp != null ? ` · ${p.gapPctUp}%↑` : "") : null} c={p.gapAvg >= 0 ? "#2FA37A" : "#C8553D"} />
+          <M l="Movimento implícito" v={p.impliedMove != null ? "±" + p.impliedMove + "%" : null} />
+          <M l="Momentum (1 mês)" v={p.momentum != null ? (p.momentum >= 0 ? "+" : "") + p.momentum + "%" : null} c={p.momentum >= 0 ? "#2FA37A" : "#C8553D"} />
+          <M l="RSI (14)" v={p.rsi != null ? String(p.rsi) : null} />
+          <M l="Tendência" v={p.trend === "bullish" ? "alta" : p.trend === "bearish" ? "baixa" : p.trend ? "neutra" : null} />
+          <M l="Analistas" v={p.analyst === "bullish" ? "otimistas" : p.analyst === "bearish" ? "pessimistas" : p.analyst ? "neutros" : null} />
+          <M l="Potencial vs alvo" v={p.targetUpside != null ? (p.targetUpside >= 0 ? "+" : "") + p.targetUpside + "%" : null} c={p.targetUpside >= 0 ? "#2FA37A" : "#C8553D"} />
+          <M l="Beat (EPS)" v={p.beatRate != null ? p.beatRate + "%" : null} />
+        </div>
+        {rTypes.length > 0 && (
+          <div className="ts-tpresearch">
+            <div className="ts-tprtabs">
+              <span className="ts-tprlabel">Pesquisa aprofundada:</span>
+              {rTypes.map((t) => <button key={t} className={rTab === t ? "on" : ""} onClick={() => setRTab(rTab === t ? null : t)}>{RESEARCH_LABELS[t]}</button>)}
+            </div>
+            {rTab && research[rTab] && <div className="ts-tprtext">{research[rTab]}</div>}
+          </div>
+        )}
+        <div className="ts-modalfoot"><a href={"#stock/" + p.ticker} onClick={onClose}>Ver página completa →</a> <span className="ts-tpnote">Probabilidade/opinião, não recomendação.</span></div>
+      </div>
+    </div>
+  );
+}
+// Escolha do trader — a pick que o admin marcou com ★. Card grande no topo, clicável.
+function TraderPick({ pick, onDetail }) {
+  const [rTab, setRTab] = useState(null);
+  const clickT = useRef(null);
+  if (!pick) return null;
+  const p = pick;
+  const research = p.research && typeof p.research === "object" ? p.research : null;
+  const rTypes = research ? Object.keys(RESEARCH_LABELS).filter((t) => research[t]) : [];
   return (
     <section className="ts-sec ts-tpsec">
-      <div className="ts-tpcard" style={{ borderColor: probColor(p.probUp) }} onClick={() => goStock(p.ticker)}>
+      <div className="ts-tpcard" style={{ borderColor: probColor(p.probUp) }}
+        onClick={() => { if (clickT.current) return; clickT.current = setTimeout(() => { clickT.current = null; goStock(p.ticker); }, 230); }}
+        onDoubleClick={() => { if (clickT.current) { clearTimeout(clickT.current); clickT.current = null; } onDetail && onDetail(p); }}>
         <div className="ts-tphead">
           <span className="ts-tplabel">★ Escolha do trader</span>
           {p.probUp != null && <span className="ts-ftbadge" style={{ background: probColor(p.probUp) }}>↑ {p.probUp}% subir</span>}
@@ -111,6 +167,15 @@ function TraderPick({ pick }) {
           </div>
           {p.history && p.history.length > 1 && <div className="ts-tpchart"><Spark hist={p.history} marks={p.earningsMarks} /></div>}
         </div>
+        {rTypes.length > 0 && (
+          <div className="ts-tpresearch" onClick={(e) => e.stopPropagation()}>
+            <div className="ts-tprtabs">
+              <span className="ts-tprlabel">Pesquisa aprofundada:</span>
+              {rTypes.map((t) => <button key={t} className={rTab === t ? "on" : ""} onClick={() => setRTab(rTab === t ? null : t)}>{RESEARCH_LABELS[t]}</button>)}
+            </div>
+            {rTab && research[rTab] && <div className="ts-tprtext">{research[rTab]}</div>}
+          </div>
+        )}
         <div className="ts-tpfoot">Ver análise completa → <span className="ts-tpnote">Probabilidade/opinião, não recomendação.</span></div>
       </div>
     </section>
@@ -151,7 +216,8 @@ function CookieBanner() {
   );
 }
 
-function Featured({ picks, suspenso }) {
+function Featured({ picks, suspenso, onDetail }) {
+  const clickT = useRef(null);
   const list = Object.values(picks || {}).filter((p) => p.show && exchOf(p.ticker) === "EUA")
     .sort((a, b) => (a.entryISO || a.date || "").localeCompare(b.entryISO || b.date || ""))
     .slice(0, 8); // as próximas 8 publicadas (EUA, por data)
@@ -161,7 +227,10 @@ function Featured({ picks, suspenso }) {
       {list.map((p) => {
         const hasA = p.probUp != null || p.confidence != null || p.impliedMove != null || p.ev != null || p.gapUp != null || p.momentum != null || p.rsi != null || p.analyst || p.beatRate != null || p.history;
         return (
-          <div className="ts-feat ts-feat--clk" key={p.ticker} style={{ borderTopColor: probColor(p.probUp) }} onClick={() => goStock(p.ticker)} title={"Ver análise de " + p.ticker}>
+          <div className="ts-feat ts-feat--clk" key={p.ticker} style={{ borderTopColor: probColor(p.probUp) }}
+            onClick={() => { if (clickT.current) return; clickT.current = setTimeout(() => { clickT.current = null; goStock(p.ticker); }, 230); }}
+            onDoubleClick={() => { if (clickT.current) { clearTimeout(clickT.current); clickT.current = null; } onDetail && onDetail(p); }}
+            title={"Clica: análise · 2× clica: detalhe rápido"}>
             <div className="ts-feathd"><span className="ts-fttic"><Mono ticker={p.ticker} sector={p.sector} /> {p.ticker} <span className="ts-aitag" title="Análise assistida por IA">IA</span></span>{suspenso ? <span className="ts-ftbadge" style={{ background: "#8CA3B3" }}>SUSPENSO</span> : p.probUp != null ? <span className="ts-ftbadge" style={{ background: probColor(p.probUp) }}>↑ {p.probUp}%</span> : null}</div>
             <div className="ts-ftname">{p.name}{p.sector && p.sector !== "other" && <span className="ts-ftsect">{p.sector}</span>}</div>
             {p.nota && <div className="ts-ftnote">“{p.nota}”</div>}
@@ -186,7 +255,8 @@ function Featured({ picks, suspenso }) {
   );
 }
 
-function Predictions({ picks, suspenso }) {
+function Predictions({ picks, suspenso, onDetail }) {
+  const clickT = useRef(null);
   const [rows, setRows] = useState(null);
   const [err, setErr] = useState("");
   useEffect(() => {
@@ -217,7 +287,10 @@ function Predictions({ picks, suspenso }) {
           <div className="ts-daycard" key={grp.day}>
             <div className="ts-dayhdr">{wd} · {fmtDay(grp.day)} <span>entrar até ~fecho</span></div>
             {grp.items.map((it) => (
-              <div className="ts-prow ts-prow--exp" key={(it.entryISO || it.date) + it.ticker + it.when} onClick={() => goStock(it.ticker)} title={"Ver análise de " + it.ticker}>
+              <div className="ts-prow ts-prow--exp" key={(it.entryISO || it.date) + it.ticker + it.when}
+                onClick={() => { if (clickT.current) return; clickT.current = setTimeout(() => { clickT.current = null; goStock(it.ticker); }, 230); }}
+                onDoubleClick={() => { if (clickT.current) { clearTimeout(clickT.current); clickT.current = null; } onDetail && onDetail(picks[it.ticker] || { ticker: it.ticker, name: it.name, exch: exchOf(it.ticker), entryISO: it.entryISO, date: it.date }); }}
+                title={"Clica: análise · 2× clica: detalhe rápido"}>
                 <span className="ts-ptic">{it.ticker}</span>
                 <span className="ts-pex">{exchOf(it.ticker)}</span>
                 <span className="ts-pname">{it.name}</span>
@@ -524,6 +597,7 @@ export default function TraderSite() {
   }, [tapeSyms.join(",")]);
   const led = ledger.stats || null;
   const featPick = useMemo(() => Object.values(picks || {}).find((p) => p.featured && p.show), [picks]);
+  const [modalPick, setModalPick] = useState(null);
   const histSum = hist.reduce((a, r) => a + (Number(r.pnl) || 0), 0);
   const totalPL = settings.totalPL != null ? Number(settings.totalPL) : histSum; // Total L/P: da conta DEGIRO (upload) ou soma do histórico
   const saldo = settings.saldo != null ? Number(settings.saldo) : null; // saldo da conta (DEGIRO, via upload)
@@ -564,7 +638,7 @@ export default function TraderSite() {
         <div className="ts-herowarn">Conteúdo informativo — indicativo, não prova de edge. Alta variância. Não é aconselhamento financeiro.</div>
       </section>
 
-      <TraderPick pick={featPick} />
+      <TraderPick pick={featPick} onDetail={setModalPick} />
 
       <section className="ts-sec ts-topstats">
         <div className="ts-statwrap">
@@ -617,8 +691,8 @@ export default function TraderSite() {
         <h2>Previsões desta semana</h2>
         <p className="ts-lead">Quem reporta e quando (hora de Portugal). As destacadas mostram a <b>probabilidade de subir ou descer</b> nos resultados, por análise de IA. Não é recomendação de compra/venda.</p>
         {suspenso && <div className="ts-suspban">⏸ Previsões <b>suspensas</b> — capital em <b>{heldTickers}</b> (a recuperar). Não é possível entrar em novas até fechar a posição.</div>}
-        <Featured picks={picks} suspenso={suspenso} />
-        <Predictions picks={picks} suspenso={suspenso} />
+        <Featured picks={picks} suspenso={suspenso} onDetail={setModalPick} />
+        <Predictions picks={picks} suspenso={suspenso} onDetail={setModalPick} />
       </section>
 
       <HistoricoCalendario ledger={ledger} />
@@ -671,6 +745,7 @@ export default function TraderSite() {
       </footer>
 
       <TickerTape items={tape} />
+      {modalPick && <StockModal pick={modalPick} onClose={() => setModalPick(null)} />}
     </div>
   );
 }
@@ -845,6 +920,26 @@ export const CSS = `
 .ts-tpchart{width:300px;max-width:100%;}
 .ts-tpfoot{margin-top:14px;padding-top:12px;border-top:1px solid var(--line);color:var(--gold);font-size:13px;font-weight:600;}
 .ts-tpnote{color:var(--mut);font-weight:400;font-size:11.5px;}
+.ts-tpresearch{margin-top:14px;padding-top:12px;border-top:1px solid var(--line);}
+.ts-tprtabs{display:flex;flex-wrap:wrap;gap:6px;align-items:center;}
+.ts-tprlabel{font-size:12px;color:var(--gold);margin-right:4px;}
+.ts-tprtabs button{background:transparent;border:1px solid var(--line);color:var(--mut);border-radius:7px;padding:4px 10px;font-size:12px;cursor:pointer;}
+.ts-tprtabs button:hover{color:var(--tx);}
+.ts-tprtabs button.on{background:var(--gold);color:#1a1206;border-color:var(--gold);font-weight:600;}
+.ts-tprtext{margin-top:10px;background:var(--ink);border:1px solid var(--line);border-radius:8px;padding:12px 14px;font-size:13px;line-height:1.6;color:var(--tx);white-space:pre-wrap;}
+/* modal detalhe (duplo-clique) */
+.ts-modal{position:fixed;inset:0;z-index:60;background:rgba(0,0,0,.6);display:flex;align-items:flex-start;justify-content:center;padding:40px 16px;overflow-y:auto;}
+.ts-modalbox{background:var(--s1);border:1px solid var(--gold);border-radius:16px;padding:22px 24px;max-width:640px;width:100%;position:relative;box-shadow:0 20px 60px rgba(0,0,0,.5);}
+.ts-modalx{position:absolute;top:12px;right:14px;background:transparent;border:none;color:var(--mut);font-size:18px;cursor:pointer;}
+.ts-modalx:hover{color:var(--tx);}
+.ts-modalhd{display:flex;align-items:center;gap:12px;margin-bottom:6px;}
+.ts-modalhd .ts-mono{width:44px;height:44px;font-size:15px;border-radius:11px;}
+.ts-mmetrics{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin:6px 0 4px;}
+.ts-mmetric{background:var(--ink);border:1px solid var(--line);border-radius:9px;padding:9px 11px;}
+.ts-mmetric span{display:block;font-size:11px;color:var(--mut);margin-bottom:3px;}
+.ts-mmetric b{font-family:'IBM Plex Mono',monospace;font-size:16px;}
+.ts-modalfoot{margin-top:14px;padding-top:12px;border-top:1px solid var(--line);font-size:13px;}
+.ts-modalfoot a{color:var(--gold);text-decoration:none;font-weight:600;}
 @media(max-width:620px){.ts-tpchart{width:100%;}}
 /* método: timeline + regras + exemplo + stats + aviso */
 .ts-tl{display:flex;align-items:stretch;gap:8px;margin:22px 0;flex-wrap:wrap;}

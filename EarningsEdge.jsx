@@ -424,6 +424,12 @@ export default function EarningsEdge() {
       history: item.history || null, earningsMarks: item.earningsMarks || null,
       sector: item.sector || cur.sector || "",
       nota: cur.nota || item.llm?.reasoning || "",
+      // pesquisa aprofundada (texto das 5 análises) — só o texto, para mostrar no site
+      research: (() => {
+        const merged = { ...(cur.research || {}) };
+        for (const [k, v] of Object.entries(item.research || {})) if (v && v.text) merged[k] = v.text;
+        return Object.keys(merged).length ? merged : (cur.research || null);
+      })(),
     };
   };
   const autoWeek = async (arr) => {
@@ -472,6 +478,17 @@ export default function EarningsEdge() {
     setAutoRunning(false);
   };
   const atualizarTudo = async () => { const arr = await loadCalendar(); await autoWeek(arr); };
+  // seleção rápida por janela de 7 dias
+  const selectNext7 = () => {
+    const in7 = isoOf(new Date(Date.now() + 7 * 864e5)), today = isoOf(new Date());
+    const s = new Set(calendar.filter((x) => !x.past && (x.entryISO || x.date) >= today && (x.entryISO || x.date) <= in7).map((x) => x.ticker));
+    setSelected(s);
+  };
+  const selectLast7 = () => {
+    const ago7 = isoOf(new Date(Date.now() - 7 * 864e5));
+    const s = new Set(calendar.filter((x) => x.past && x.date >= ago7).map((x) => x.ticker));
+    setSelected(s);
+  };
 
   // passados: bloco próprio, mais recente primeiro. próximos: agrupados por mês.
   const pastRows = useMemo(
@@ -541,8 +558,9 @@ export default function EarningsEdge() {
         const token = localStorage.getItem("ee_admin_token");
         if (token) {
           const cal = calendar.find((c) => c.ticker === item.ticker && !c.past);
+          const itemWithResearch = { ...item, research: { ...(item.research || {}), [type]: { text } } };
           const all = await (await fetch("/api/picks/all", { cache: "no-store", headers: { Authorization: "Bearer " + token } })).json();
-          all[item.ticker] = pickFromItem(item, cal, all[item.ticker] || {});
+          all[item.ticker] = pickFromItem(itemWithResearch, cal, all[item.ticker] || {});
           await fetch("/api/picks", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + token }, body: JSON.stringify({ picks: all }) });
         }
       }
@@ -605,12 +623,32 @@ export default function EarningsEdge() {
         await fetch("/api/picks", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + token }, body: JSON.stringify({ picks: all }) });
       }
     } catch (_) {}
-    // pesquisa aprofundada: 5 análises por ação (pool de 4)
+    // pesquisa aprofundada: 5 análises por ação (pool de 4) — acumula o texto p/ persistir
     const types = ["financial", "equity", "earnings", "market", "government"];
+    const acc = {}; // ticker -> { type: {text} }
     const jobs = []; for (const it of items) for (const ty of types) jobs.push({ it, ty });
     let j = 0;
-    const worker = async () => { while (j < jobs.length) { const { it, ty } = jobs[j++]; try { await runResearch(it, ty); } catch (_) {} } };
+    const worker = async () => {
+      while (j < jobs.length) {
+        const { it, ty } = jobs[j++];
+        setResults((r) => r.map((x) => (x.id === it.id ? { ...x, research: { ...(x.research || {}), [ty]: { loading: true } } } : x)));
+        try {
+          const text = await fetchResearch(it.ticker, ty);
+          (acc[it.ticker] = acc[it.ticker] || {})[ty] = { text };
+          setResults((r) => r.map((x) => (x.id === it.id ? { ...x, research: { ...(x.research || {}), [ty]: { text } } } : x)));
+        } catch (_) {}
+      }
+    };
     await Promise.all(Array.from({ length: 4 }, worker));
+    // re-publicar com a pesquisa aprofundada incluída (para aparecer no card)
+    try {
+      const token = localStorage.getItem("ee_admin_token");
+      if (token && items.length) {
+        const all = await (await fetch("/api/picks/all", { cache: "no-store", headers: { Authorization: "Bearer " + token } })).json();
+        for (const it of items) { const cal = calendar.find((c) => c.ticker === it.ticker && !c.past); all[it.ticker] = pickFromItem({ ...it, research: acc[it.ticker] || {} }, cal, all[it.ticker] || {}); }
+        await fetch("/api/picks", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + token }, body: JSON.stringify({ picks: all }) });
+      }
+    } catch (_) {}
     setSelected(new Set());
     setBatchRunning(false);
   };
@@ -696,6 +734,12 @@ export default function EarningsEdge() {
           </button>
         </div>
         {autoMsg && <div className="ee-auto-msg">{autoRunning ? "⏳ " : ""}{autoMsg}</div>}
+
+        <div className="ee-quicksel">
+          <span>Selecionar:</span>
+          <button onClick={selectNext7}>próximos 7 dias</button>
+          <button onClick={selectLast7}>últimos 7 dias</button>
+        </div>
 
         <button className="ee-legend-toggle" onClick={() => setShowLegend((s) => !s)}>
           {showLegend ? "▾ esconder áreas" : "▸ ver áreas"}
@@ -1719,6 +1763,9 @@ const CSS = `
 .ee-cal-hit{font-weight:600;}
 .ee-cal-empty{color:var(--muted);font-size:13px;padding:12px 0;}
 .ee-auto-msg{background:rgba(214,164,69,.10);border:1px solid var(--line);border-radius:8px;padding:9px 12px;font-size:12.5px;color:#f0d9a8;margin:8px 0;}
+.ee-quicksel{display:flex;align-items:center;gap:8px;margin:8px 0;font-size:12.5px;color:var(--muted);flex-wrap:wrap;}
+.ee-quicksel button{background:transparent;border:1px solid var(--gold);color:var(--gold);border-radius:7px;padding:4px 12px;font-size:12.5px;cursor:pointer;}
+.ee-quicksel button:hover{background:var(--gold);color:#1a1206;}
 .ee-cal-foot{font-size:11px;color:var(--muted);line-height:1.5;margin-top:10px;border-top:1px solid var(--line);padding-top:10px;}
 .ee-inline-retry{background:none;border:none;color:var(--gold);text-decoration:underline;cursor:pointer;font-size:inherit;}
 .ee-error{background:rgba(200,85,61,.12);border:1px solid #C8553D;color:#f0b8ab;border-radius:10px;padding:12px 14px;font-size:13.5px;margin-bottom:14px;line-height:1.5;}
