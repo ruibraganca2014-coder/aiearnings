@@ -82,14 +82,8 @@ function Featured({ picks, suspenso }) {
               <div className="ts-ftdet">
                 {p.history && <Spark hist={p.history} marks={p.earningsMarks} />}
                 {p.probUp != null && <div><span>Probabilidade de subir</span><b style={{ color: p.probUp >= 55 ? "#2FA37A" : p.probUp <= 45 ? "#C8553D" : "#D6A445" }}>{p.probUp}%</b></div>}
-                {p.confidence != null && <div><span>Confiança</span><b>{p.confidence}%</b></div>}
-                {p.impliedMove != null && <div><span>Movimento implícito</span><b>±{p.impliedMove}%</b></div>}
                 {p.ev != null && <div><span>Valor esperado</span><b style={{ color: p.ev >= 0 ? "#2FA37A" : "#C8553D" }}>{p.ev >= 0 ? "+" : ""}{p.ev}%/trade</b></div>}
-                {p.gapUp != null && <div><span>Gap histórico ↑</span><b>{p.gapUp}%</b></div>}
-                {(p.momentum != null || p.rsi != null) && <div><span>Momentum / RSI</span><b>{p.momentum != null ? (p.momentum >= 0 ? "+" : "") + p.momentum + "%" : "—"} / {p.rsi ?? "—"}</b></div>}
-                {p.analyst && <div><span>Analistas</span><b style={{ textTransform: "capitalize" }}>{p.analyst}{p.targetUpside != null ? ` · alvo ${p.targetUpside >= 0 ? "+" : ""}${p.targetUpside}%` : ""}</b></div>}
-                {p.beatRate != null && <div><span>Taxa de beat</span><b>{p.beatRate}%</b></div>}
-                <div className="ts-ftwarn">⚠ Probabilidade, não garantia. Edge fraco (histórico ~moeda ao ar). Não é recomendação.</div>
+                <div className="ts-ftwarn">⚠ Probabilidade, não garantia. Não é recomendação.</div>
               </div>
             )}
           </div>
@@ -135,6 +129,7 @@ function Predictions({ picks, suspenso }) {
                 <span className="ts-pex">{exchOf(it.ticker)}</span>
                 <span className="ts-pname">{it.name}</span>
                 <span className="ts-pwhen">{it.when === "BMO" ? "pré-abertura" : it.when === "AMC" ? "após fecho" : ""}</span>
+                {!suspenso && picks[it.ticker]?.show && (() => { const p2 = picks[it.ticker]; const parts = []; if (p2.confidence != null) parts.push("conf " + p2.confidence + "%"); if (p2.ev != null) parts.push("EV " + (p2.ev >= 0 ? "+" : "") + p2.ev + "%"); if (p2.gapUp != null) parts.push("gap↑ " + p2.gapUp + "%"); if (p2.impliedMove != null) parts.push("±" + p2.impliedMove + "%"); return parts.length ? <span className="ts-pmetrics">{parts.join(" · ")}</span> : null; })()}
                 {suspenso
                   ? <span className="ts-pbadge" style={{ background: "#8CA3B3" }}>SUSPENSO</span>
                   : picks[it.ticker]?.show && picks[it.ticker]?.probUp != null
@@ -552,6 +547,7 @@ const CSS = `
 .ts-ftdet>div{display:flex;justify-content:space-between;font-size:12.5px;color:var(--mut);}
 .ts-ftdet>div b{color:var(--tx);font-family:'IBM Plex Mono',monospace;}
 .ts-ftwarn{display:block!important;color:#f0d9a8;font-size:11px;line-height:1.4;background:rgba(214,164,69,.1);border-radius:6px;padding:8px;margin-top:4px;}
+.ts-pmetrics{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--mut);white-space:nowrap;}
 .ts-pbadge{color:#0E1620;font-weight:700;font-size:10.5px;padding:1px 7px;border-radius:5px;font-family:'IBM Plex Mono',monospace;}
 .ts-naotag{font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:var(--mut);border:1px solid var(--line);border-radius:4px;padding:0 5px;}
 .ts-prow--info{opacity:.72;}
