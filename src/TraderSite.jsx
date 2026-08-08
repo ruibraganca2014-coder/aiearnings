@@ -157,30 +157,66 @@ export function StockModal({ pick, onClose }) {
 function TraderPick({ pick, onDetail }) {
   if (!pick) return null;
   const p = pick;
+  const conv = p.confidence == null ? null : p.confidence >= 60 ? "alta" : p.confidence >= 40 ? "média" : "baixa";
+  const convC = conv === "alta" ? "#2FA37A" : conv === "média" ? "#D6A445" : "#C8553D";
+  const target = (p.targetUpside != null && p.price != null) ? { px: (p.price * (1 + p.targetUpside / 100)).toFixed(0), up: p.targetUpside } : null;
+  const stopPx = p.price != null ? (p.price * 0.9).toFixed(0) : null;
+  const entryTxt = (p.when === "BMO" ? "pré-abertura" : p.when === "AMC" ? "após fecho" : "") + (p.buyBy ? " · " + p.buyBy : p.entryISO ? " · " + fmtDay(p.entryISO) : "");
   return (
     <section className="ts-sec ts-tpsec">
       <div className="ts-tpcard" style={{ borderColor: probColor(p.probUp) }} onClick={() => onDetail && onDetail(p)}>
         <div className="ts-tphead">
           <span className="ts-tplabel">★ Escolha do trader</span>
-          {p.probUp != null && <span className="ts-ftbadge" style={{ background: probColor(p.probUp) }}>↑ {p.probUp}% subir</span>}
+          <span className="ts-tpbadges">
+            {conv && <span className="ts-convchip" style={{ borderColor: convC, color: convC }}>convicção {conv}</span>}
+            {p.probUp != null && <span className="ts-ftbadge" style={{ background: probColor(p.probUp) }}>↑ {p.probUp}% subir</span>}
+          </span>
         </div>
+
         <div className="ts-tpbody">
           <div className="ts-tpleft">
             <div className="ts-tptop"><CompanyLogo ticker={p.ticker} sector={p.sector} website={p.website} /><div><div className="ts-tptic">{p.ticker} <span className="ts-aitag">IA</span>{p.sector && THEME_LABELS[p.sector] && <span className="ts-themetag">{THEME_LABELS[p.sector]}</span>}</div><div className="ts-tpname">{p.name}{p.isin && <span className="ts-isin"> · ISIN {p.isin}</span>}</div></div></div>
             {p.nota && <div className="ts-tpnota">“{p.nota}”</div>}
-            <div className="ts-tpmetrics">
-              {p.probUp != null && <div><span>Prob. subir</span><b style={{ color: probColor(p.probUp) }}>{p.probUp}%</b></div>}
-              {p.ev != null && <div><span>Valor esperado</span><b style={{ color: p.ev >= 0 ? "#2FA37A" : "#C8553D" }}>{p.ev >= 0 ? "+" : ""}{p.ev}%</b></div>}
-              {p.price != null && <div><span>Preço</span><b>${p.price}</b></div>}
-              {(p.earningsDate || p.entryISO) && <div><span>{p.earningsDate ? "Resultados" : "Entrar"}</span><b>{fmtDay(p.earningsDate || p.entryISO)}</b></div>}
-              {p.gapAvg != null && <div><span>Gap médio</span><b style={{ color: p.gapAvg >= 0 ? "#2FA37A" : "#C8553D" }}>{p.gapAvg >= 0 ? "+" : ""}{p.gapAvg}%{p.gapPctUp != null ? ` · ${p.gapPctUp}%↑` : ""}</b></div>}
-            </div>
           </div>
           {p.history && p.history.length > 1 && <div className="ts-tpchart"><Spark hist={p.history} marks={p.earningsMarks} /></div>}
         </div>
 
-        {(p.signals?.length || p.reactions?.length) && (
-          <div className="ts-tpsig" onClick={(e) => e.stopPropagation()}>
+        {/* Plano de trade: entrada → alvo → stop */}
+        <div className="ts-tpplan">
+          <div className="ts-tpplanstep"><span>1 · Entrada</span><b>{entryTxt || (p.entryISO ? fmtDay(p.entryISO) : "—")}</b></div>
+          <span className="ts-tpplanarr">→</span>
+          <div className="ts-tpplanstep"><span>2 · Alvo</span><b style={{ color: "#2FA37A" }}>{target ? `$${target.px} (${target.up >= 0 ? "+" : ""}${target.up}%)` : "—"}</b></div>
+          <span className="ts-tpplanarr">→</span>
+          <div className="ts-tpplanstep ts-tpplanstop"><span>3 · Stop</span><b style={{ color: "#C8553D" }}>−10%{stopPx ? ` · $${stopPx}` : ""}</b></div>
+        </div>
+
+        {/* Decisão */}
+        <div className="ts-tpgroup">
+          <h4>Decisão</h4>
+          <div className="ts-ftgrid">
+            {p.probUp != null && <FtCell l="Prob. subir" v={p.probUp + "%"} c={probColor(p.probUp)} fill={p.probUp} fillc={probColor(p.probUp)} />}
+            {p.ev != null && <FtCell l="Valor esperado" v={(p.ev >= 0 ? "+" : "") + p.ev + "%/trade"} c={p.ev >= 0 ? "#2FA37A" : "#C8553D"} sig={p.ev} sigmax={12} />}
+          </div>
+        </div>
+
+        {/* Mercado */}
+        <div className="ts-tpgroup">
+          <h4>Mercado</h4>
+          <div className="ts-ftgrid">
+            {p.price != null && <FtCell l="Preço" v={"$" + p.price} />}
+            {p.gapAvg != null && <FtCell l="Gap médio" v={(p.gapAvg >= 0 ? "+" : "") + p.gapAvg + "%"} c={p.gapAvg >= 0 ? "#2FA37A" : "#C8553D"} sub={p.gapPctUp != null ? p.gapPctUp + "% sobem" : ""} sig={p.gapAvg} sigmax={10} />}
+            {p.impliedMove != null && <FtCell l="Mov. implícito" v={"±" + p.impliedMove + "%"} fill={Math.min(100, p.impliedMove * 5)} fillc="#8CA3B3" />}
+            {p.momentum != null && <FtCell l="Momentum 1m" v={(p.momentum >= 0 ? "+" : "") + p.momentum + "%"} c={p.momentum >= 0 ? "#2FA37A" : "#C8553D"} sig={p.momentum} sigmax={15} />}
+            {p.rsi != null && <FtCell l={"RSI" + (p.trend ? " · " + (p.trend === "bullish" ? "alta" : p.trend === "bearish" ? "baixa" : "neutra") : "")} v={String(p.rsi)} fill={p.rsi} fillc={p.rsi >= 70 ? "#C8553D" : p.rsi <= 30 ? "#2FA37A" : "#8CA3B3"} />}
+            {p.analyst && <FtCell l="Analistas" v={p.analyst === "bullish" ? "otimistas" : p.analyst === "bearish" ? "pessimistas" : "neutros"} c={p.analyst === "bullish" ? "#2FA37A" : p.analyst === "bearish" ? "#C8553D" : "var(--tx)"} sub={p.targetUpside != null ? "alvo " + (p.targetUpside >= 0 ? "+" : "") + p.targetUpside + "%" : ""} />}
+            {p.beatRate != null && <FtCell l="Beat (EPS)" v={p.beatRate + "%"} fill={p.beatRate} fillc="#8CA3B3" />}
+          </div>
+        </div>
+
+        {/* Contexto & incerteza */}
+        {(p.signals?.length || p.reactions?.length || p.shortPct != null || p.reactionN) && (
+          <div className="ts-tpgroup" onClick={(e) => e.stopPropagation()}>
+            <h4>Contexto & incerteza</h4>
             <div className="ts-tpsighint">⚠ Sinais = leitura de incerteza, não previsão. A direção nos resultados é quase <b>moeda ao ar</b> — sem edge provado (backtest ~48%).</div>
             {p.signals?.length > 0 && (
               <div className="ts-tpsiggrid">
@@ -193,14 +229,13 @@ function TraderPick({ pick, onDetail }) {
                 <div className="ts-tpreacbars">{p.reactions.map((r, i) => <span key={i} className="ts-tpreacbar" title={(r >= 0 ? "+" : "") + r + "%"}><span style={{ height: Math.min(100, Math.abs(r) * 3) + "%", background: r >= 0 ? "#2FA37A" : "#C8553D" }} /></span>)}</div>
               </div>
             )}
+            <div className="ts-tpextra">
+              {p.reactionLow != null && p.reactionHigh != null && <span><b>Reação típica:</b> {p.reactionLow}%…{p.reactionHigh}% (±1σ){p.reactionMin != null ? ` · extremos ${p.reactionMin}%…${p.reactionMax}%` : ""}{p.reactionN ? ` · ${p.reactionN} amostras` : ""}</span>}
+              {p.shortPct != null && <span><b>Short interest:</b> {p.shortPct}% do float</span>}
+              {p.confidence != null && <span><b>Confiança IA:</b> {p.confidence}%{p.signals?.length ? ` · ${p.signals.length} sinais` : ""}{p.reactionN ? ` · ${p.reactionN} reações` : ""}</span>}
+            </div>
           </div>
         )}
-        <div className="ts-tpextra" onClick={(e) => e.stopPropagation()}>
-          {(p.when || p.buyBy || p.entryISO) && <span><b>Entrada:</b> {p.when === "BMO" ? "pré-abertura" : p.when === "AMC" ? "após fecho" : "intradia"}{p.buyBy ? ` · ${p.buyBy}` : p.entryISO ? ` · até ${fmtDay(p.entryISO)}` : ""}</span>}
-          {p.reactionLow != null && p.reactionHigh != null && <span><b>Reação típica:</b> {p.reactionLow}%…{p.reactionHigh}% (±1σ){p.reactionMin != null ? ` · extremos ${p.reactionMin}%…${p.reactionMax}%` : ""}{p.reactionN ? ` · ${p.reactionN} amostras` : ""}</span>}
-          {p.shortPct != null && <span><b>Short interest:</b> {p.shortPct}% do float</span>}
-          {p.confidence != null && <span><b>Confiança IA:</b> {p.confidence}%{p.signals?.length ? ` · ${p.signals.length} sinais` : ""}{p.reactionN ? ` · ${p.reactionN} reações` : ""}</span>}
-        </div>
         <div className="ts-tpfoot"><span className="ts-tpnote">Probabilidade/opinião, não recomendação.</span></div>
       </div>
     </section>
@@ -990,6 +1025,17 @@ export const CSS = `
 .ts-tpreacbar>span{display:block;width:100%;border-radius:3px;}
 .ts-tpextra{margin-top:12px;padding-top:10px;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:5px;font-size:12px;color:var(--mut);}
 .ts-tpextra b{color:var(--tx);font-weight:600;}
+.ts-tpbadges{display:flex;gap:8px;align-items:center;}
+.ts-convchip{font-size:11px;border:1px solid;border-radius:20px;padding:2px 10px;font-weight:600;}
+.ts-tpplan{display:flex;align-items:stretch;gap:8px;margin:14px 0;flex-wrap:wrap;}
+.ts-tpplanstep{flex:1;min-width:120px;background:var(--s2);border:1px solid var(--line);border-radius:10px;padding:10px 12px;display:flex;flex-direction:column;gap:3px;}
+.ts-tpplanstep span{font-size:11px;color:var(--mut);}
+.ts-tpplanstep b{font-family:'IBM Plex Mono',monospace;font-size:14px;}
+.ts-tpplanstop{border-color:rgba(200,85,61,.4);}
+.ts-tpplanarr{display:flex;align-items:center;color:var(--gold);font-size:18px;}
+@media(max-width:600px){.ts-tpplanarr{display:none;}}
+.ts-tpgroup{margin-top:14px;padding-top:12px;border-top:1px solid var(--line);}
+.ts-tpgroup h4{font-family:'Space Grotesk',sans-serif;font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--gold);margin:0 0 10px;}
 @media(max-width:620px){.ts-tpchart{width:100%;}}
 /* método: timeline + regras + exemplo + stats + aviso */
 .ts-tl{display:flex;align-items:stretch;gap:8px;margin:22px 0;flex-wrap:wrap;}
