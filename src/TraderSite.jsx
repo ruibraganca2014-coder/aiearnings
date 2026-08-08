@@ -303,7 +303,10 @@ export function Featured({ picks, suspenso, onDetail }) {
                   {p.rsi != null && <FtCell l={"RSI" + (p.trend ? " · " + (p.trend === "bullish" ? "alta" : p.trend === "bearish" ? "baixa" : "neutra") : "")} v={String(p.rsi)} fill={p.rsi} fillc={p.rsi >= 70 ? "#C8553D" : p.rsi <= 30 ? "#2FA37A" : "#8CA3B3"} />}
                   {p.analyst && <FtCell l="Analistas" v={p.analyst === "bullish" ? "otimistas" : p.analyst === "bearish" ? "pessimistas" : "neutros"} c={p.analyst === "bullish" ? "#2FA37A" : p.analyst === "bearish" ? "#C8553D" : "var(--tx)"} sub={p.targetUpside != null ? "alvo " + (p.targetUpside >= 0 ? "+" : "") + p.targetUpside + "%" : ""} />}
                   {p.beatRate != null && <FtCell l="Beat (EPS)" v={p.beatRate + "%"} fill={p.beatRate} fillc="#8CA3B3" />}
+                  {p.ev == null && p.impliedMove == null && p.targetUpside != null && <FtCell l="Potencial alvo" v={(p.targetUpside >= 0 ? "+" : "") + p.targetUpside + "%"} c={p.targetUpside >= 0 ? "#2FA37A" : "#C8553D"} sig={p.targetUpside} sigmax={30} />}
+                  {p.ev == null && p.impliedMove == null && p.shortPct != null && <FtCell l="Short interest" v={p.shortPct + "%"} fill={Math.min(100, p.shortPct * 4)} fillc="#8CA3B3" />}
                 </div>
+                {p.ev == null && p.impliedMove == null && <div className="ts-ftlimited">Sem dados de reação a resultados (mercado fora dos EUA). Mostramos as métricas disponíveis.</div>}
               </>
             )}
           </div>
@@ -882,7 +885,8 @@ export const CSS = `
 .ts-stat span{display:block;font-size:12.5px;color:var(--tx);margin-top:4px;}
 .ts-stat small{display:block;font-size:11px;color:var(--mut);margin-top:3px;}
 .ts-suspban{background:rgba(140,163,179,.14);border:1px solid var(--mut);border-radius:10px;padding:11px 14px;font-size:13.5px;color:var(--tx);margin-bottom:18px;}
-.ts-featwrap{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px;margin-bottom:22px;}
+.ts-featwrap{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px;margin-bottom:22px;align-items:start;}
+.ts-ftlimited{margin-top:10px;font-size:10.5px;color:var(--mut);border-top:1px dashed var(--line);padding-top:8px;line-height:1.45;}
 .ts-feat{background:var(--s1);border:1px solid var(--line);border-top:3px solid;border-radius:12px;padding:14px;}
 .ts-feathd{display:flex;justify-content:space-between;align-items:center;}
 .ts-fttic{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:18px;}
