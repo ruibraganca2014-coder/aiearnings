@@ -22,7 +22,6 @@ export default function StockPage({ ticker }) {
   const myWins = myTrades.filter((t) => t.pl > 0).length;
   const myPL = myTrades.reduce((s, t) => s + t.pl, 0);
   const back = () => { window.location.hash = "#site"; };
-  const M = (v, suf = "") => (v == null ? "—" : (typeof v === "number" ? v : v) + suf);
 
   return (
     <div className="ts-root sp-root">

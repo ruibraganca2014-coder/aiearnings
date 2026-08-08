@@ -32,7 +32,7 @@ export function Spark({ hist, marks }) {
         <path d={path} fill="none" stroke={up ? "#2FA37A" : "#C8553D"} strokeWidth="1.6" />
       </svg>
       <div className="ts-sparkbtns">
-        {SPARK_PER.map(([k, l]) => <button key={k} className={per === k ? "on" : ""} onClick={() => setPer(k)}>{l}</button>)}
+        {SPARK_PER.map(([k, l]) => <button key={k} className={per === k ? "on" : ""} onClick={(e) => { e.stopPropagation(); setPer(k); }}>{l}</button>)}
       </div>
     </div>
   );
@@ -117,53 +117,6 @@ function TraderPick({ pick }) {
   );
 }
 
-// Secção educativa — respostas honestas (acordeão). Reforça transparência e SEO.
-const EDU = [
-  {
-    q: "O que são ações?",
-    a: "Uma ação é uma fatia de propriedade de uma empresa. Quando compras, passas a dono de uma pequena parte. O preço sobe e desce conforme o que o mercado acha que a empresa vale — lucros, notícias, expectativas. Ganhas se venderes mais caro do que compraste (ou por dividendos). Não há garantia de subir: podes perder parte, ou todo, o capital.",
-  },
-  {
-    q: "A “lei dos grandes números” torna isto seguro, como um casino?",
-    a: "Não — e é um erro perigoso. O casino ganha porque tem vantagem matemática (house edge) em cada jogada; a lei dos grandes números faz essa vantagem dominar ao fim de muitas apostas. O casino é a casa. Prever a direção de uma ação nos resultados é ~moeda ao ar (≈50/50), sem vantagem provada. Sem vantagem, a lei dos grandes números trabalha CONTRA ti: convergirias para zero menos custos (comissões, juro de margem, câmbio). Muitas jogadas só garantem lucro para quem tem edge.",
-  },
-  {
-    q: "“Só perco se a empresa falir” — é verdade?",
-    a: "Falso. Realizas perda assim que vendes abaixo do preço de compra (já aconteceu: GOOG −7,7%). Uma ação pode ficar em baixo anos, ou nunca recuperar, sem falir. E com margem podes ter um margin call: a corretora vende à força no pior momento e podes perder MAIS do que investiste. Basta um gap de −30% nos resultados (comuns) para limpar uma conta alavancada. A falência é só o pior caso — há muitas formas de perder antes disso.",
-  },
-  {
-    q: "O que é a margem (alavancagem) e porque é perigosa?",
-    a: "Margem é dinheiro emprestado pela corretora para comprares mais do que o teu capital. Amplifica os ganhos — mas amplifica na mesma medida as perdas, cobra juro diário, e pode forçar a venda (margin call) quando a posição cai. Em overnight de resultados, onde os gaps são grandes, é dos usos mais arriscados. Uso margem neste método; por isso o risco é elevado e assumido.",
-  },
-  {
-    q: "Bater as estimativas garante que a ação sobe?",
-    a: "Não. É comum uma empresa bater as estimativas e mesmo assim a ação cair — o chamado “sell-the-news” (o bom resultado já estava no preço). Por isso prever a DIREÇÃO é mais difícil do que prever se bate a estimativa. Trato tudo como probabilidade, nunca como certeza.",
-  },
-  {
-    q: "Então porquê seguir isto?",
-    a: "Como educação e entretenimento, com total transparência — mostro os trades reais (ganhos E perdas) tirados do extrato do broker. Não vendo certezas nem um “sistema que não perde”. É opinião pessoal e análise assistida por IA, não recomendação nem aconselhamento financeiro. Investe só o que podes perder e faz a tua própria análise.",
-  },
-];
-function Educacao() {
-  const [open, setOpen] = useState(null);
-  return (
-    <section id="site-edu" className="ts-sec">
-      <h2>Aprende — educação</h2>
-      <p className="ts-lead">Sem jargão, sem promessas. O essencial para perceberes o risco antes de arriscares. Não é aconselhamento financeiro.</p>
-      <div className="ts-edu">
-        {EDU.map((it, i) => (
-          <div className={"ts-eduitem" + (open === i ? " open" : "")} key={i}>
-            <button className="ts-eduq" onClick={() => setOpen(open === i ? null : i)}>
-              <span className={"ts-caret" + (open === i ? " open" : "")}>▸</span> {it.q}
-            </button>
-            {open === i && <div className="ts-edua">{it.a}</div>}
-          </div>
-        ))}
-      </div>
-    </section>
-  );
-}
-
 const POSTS = [
   { tag: "Educação", title: "O que é o gap de earnings", body: "A reação imediata de uma ação aos resultados (fecho antes → abertura depois). É das jogadas mais imprevisíveis — bater estimativas não garante subir (sell-the-news)." },
   { tag: "Risco", title: "Porque o tamanho da posição manda", body: "Um único gap de −10% pode apagar 4-5 pequenos ganhos. Arriscar só uma fração pequena da conta por trade é o que te mantém no jogo. Nunca com alavancagem em overnight de earnings." },
@@ -208,7 +161,7 @@ function Featured({ picks, suspenso }) {
       {list.map((p) => {
         const hasA = p.probUp != null || p.confidence != null || p.impliedMove != null || p.ev != null || p.gapUp != null || p.momentum != null || p.rsi != null || p.analyst || p.beatRate != null || p.history;
         return (
-          <div className="ts-feat" key={p.ticker} style={{ borderTopColor: probColor(p.probUp) }}>
+          <div className="ts-feat ts-feat--clk" key={p.ticker} style={{ borderTopColor: probColor(p.probUp) }} onClick={() => goStock(p.ticker)} title={"Ver análise de " + p.ticker}>
             <div className="ts-feathd"><span className="ts-fttic"><Mono ticker={p.ticker} sector={p.sector} /> {p.ticker} <span className="ts-aitag" title="Análise assistida por IA">IA</span></span>{suspenso ? <span className="ts-ftbadge" style={{ background: "#8CA3B3" }}>SUSPENSO</span> : p.probUp != null ? <span className="ts-ftbadge" style={{ background: probColor(p.probUp) }}>↑ {p.probUp}%</span> : null}</div>
             <div className="ts-ftname">{p.name}{p.sector && p.sector !== "other" && <span className="ts-ftsect">{p.sector}</span>}</div>
             {p.nota && <div className="ts-ftnote">“{p.nota}”</div>}
@@ -258,7 +211,7 @@ function Predictions({ picks, suspenso }) {
           <div className="ts-daycard" key={grp.day}>
             <div className="ts-dayhdr">{wd} · {fmtDay(grp.day)} <span>entrar até ~fecho</span></div>
             {grp.items.map((it) => (
-              <div className="ts-prow" key={(it.entryISO || it.date) + it.ticker + it.when}>
+              <div className="ts-prow ts-prow--exp" key={(it.entryISO || it.date) + it.ticker + it.when} onClick={() => goStock(it.ticker)} title={"Ver análise de " + it.ticker}>
                 <span className="ts-ptic">{it.ticker}</span>
                 <span className="ts-pex">{exchOf(it.ticker)}</span>
                 <span className="ts-pname">{it.name}</span>
@@ -369,45 +322,50 @@ function Positions() {
 function Metodo({ ledger }) {
   const led = ledger?.stats || null;
   const ex = (ledger?.trades || []).find((t) => t.ticker === "NET") || (ledger?.trades || []).find((t) => t.pl > 0) || null;
-  const steps = [
-    { n: "1", t: "Capital fixo", d: "Trabalho sempre com o mesmo montante base (€2.500). Uma posição de cada vez, com o capital todo nessa ação. Não aumento a exposição quando corre bem." },
-    { n: "2", t: "Análise por IA", d: "Antes de entrar, vejo a probabilidade de a ação subir ou descer nos resultados (dados de mercado + IA). É probabilidade, não garantia." },
-    { n: "3", t: "Entrar antes dos resultados", d: "Compro pouco antes do anúncio. Uso margem da DEGIRO para reforçar a posição — a margem amplifica os ganhos, mas amplifica na mesma medida as perdas." },
-    { n: "4", t: "Concentração assumida (risco)", d: "Concentro tudo numa só ação, com margem. Não é diversificado: é risco alto e assumido — uma única perda grande pesa muito. Faço-o por convicção no sinal, não porque é seguro." },
-    { n: "5", t: "Se cair, esperar — com stop", d: "Se cai, espero recuperar o preço de compra (contador na secção Posições). Mas corto se a queda passar de −10%. Sem limite de tempo. Risco: nem toda a ação recupera." },
-    { n: "6", t: "Retirar o lucro", d: "Ao fim do mês retiro o ganho e reponho o capital no valor base. Limitar exposição, não multiplicar risco." },
+  // Fast Run: fluxo único — varrer → recolher → pontuar → escolher → entrar → gerir
+  const flow = [
+    { n: "1", fase: "Análise", t: "Varrer os resultados do dia", d: "Todos os dias, o Fast Run lista as empresas que apresentam resultados (EUA + Europa)." },
+    { n: "2", fase: "Análise", t: "Recolher informação multi-fonte", d: "Para cada uma, junta analistas e preço-alvo, dados de mercado e histórico, opções (movimento implícito) e fundamentais (beat, valuation, revisões de EPS)." },
+    { n: "3", fase: "Análise", t: "Pontuar com IA", d: "A IA combina tudo numa probabilidade de subir ou descer + valor esperado. É probabilidade, não garantia." },
+    { n: "4", fase: "Decisão", t: "O gestor escolhe a recomendação", d: "Entre as candidatas, escolho a que recomendaria — a “Escolha do trader”. Decisão humana, não automática." },
+    { n: "5", fase: "Execução", t: "Entrar antes dos resultados", d: "Compro segundos antes do fecho da bolsa, no dia do anúncio: capital base €2.500, uma posição de cada vez, com margem DEGIRO (amplifica ganhos e perdas)." },
+    { n: "6", fase: "Execução", t: "Gerir e sair", d: "Sobe → vendo o ganho. Cai → espero recuperar o preço, mas corto no stop de −10%. Ao fim do mês retiro o lucro e reponho a base." },
+  ];
+  const fontes = [
+    { t: "Analistas & preço-alvo", d: "recomendações e potencial vs preço atual" },
+    { t: "Mercado & histórico", d: "reações passadas, gap, momentum, RSI, tendência" },
+    { t: "Opções", d: "movimento implícito (straddle ATM)" },
+    { t: "Fundamentais", d: "beat histórico, valuation, revisões de EPS" },
   ];
   const regras = [
     ["Capital base", "€2.500"],
     ["Posições em simultâneo", "1 (capital todo)"],
     ["Alavancagem", "margem DEGIRO"],
-    ["Entrada", "pouco antes dos resultados"],
+    ["Entrada", "segundos antes do fecho (dia do anúncio)"],
     ["Stop de perda", "−10%"],
     ["Saída", "ao recuperar o preço (ou stop)"],
     ["Lucro", "retirado ao fim do mês"],
   ];
   return (
     <section id="site-metodo" className="ts-sec">
-      <h2>O método</h2>
-      <p className="ts-lead">Gestão de capital simples e disciplinada. <b>Importante:</b> é trading ativo de <b>alto risco</b>, não “renda passiva” garantida. Uso <b>margem</b> e <b>concentro tudo numa ação</b> — posso perder muito depressa. Isto é opinião/educação, <b>não recomendação nem aconselhamento financeiro</b>.</p>
-      <div className="ts-steps">
-        {steps.map((s) => (
-          <div className="ts-step" key={s.n}><div className="ts-stepn">{s.n}</div><div><b>{s.t}</b><p>{s.d}</p></div></div>
+      <h2>O método — <span style={{ color: "var(--gold)" }}>Fast Run</span></h2>
+      <p className="ts-lead"><b>Fast Run</b> é o modelo que uso: varre diariamente as ações com resultados, recolhe informação de várias fontes financeiras + IA, e no fim <b>eu (gestor) escolho</b> a que recomendaria. <b>Alto risco</b> — uso margem e concentro numa ação. Isto é opinião/educação, <b>não recomendação nem aconselhamento financeiro</b>.</p>
+
+      <div className="ts-flow">
+        {flow.map((s, i) => (
+          <div className="ts-flowstep" key={s.n} data-fase={s.fase}>
+            <div className="ts-flowtop"><span className="ts-flown">{s.n}</span><span className="ts-flowfase">{s.fase}</span></div>
+            <b>{s.t}</b>
+            <p>{s.d}</p>
+          </div>
         ))}
       </div>
 
-      {/* linha temporal do trade */}
-      <div className="ts-tl">
-        <div className="ts-tlstep"><span className="ts-tlnum">1</span><b>Comprar</b><small>pouco antes dos resultados (com margem)</small></div>
-        <div className="ts-tlarr">→</div>
-        <div className="ts-tlstep"><span className="ts-tlnum">2</span><b>Resultados</b><small>a empresa reporta</small></div>
-        <div className="ts-tlarr">→</div>
-        <div className="ts-tlstep ts-tlsplit">
-          <div className="ts-tlup"><b>Subiu → vender</b><small>realiza o ganho</small></div>
-          <div className="ts-tldown"><b>Caiu → esperar</b><small>recuperar o preço · corta a −10%</small></div>
+      <div className="ts-fontes">
+        <h3>Fontes que o Fast Run analisa</h3>
+        <div className="ts-fontesgrid">
+          {fontes.map((f) => <div className="ts-fonte" key={f.t}><b>{f.t}</b><span>{f.d}</span></div>)}
         </div>
-        <div className="ts-tlarr">→</div>
-        <div className="ts-tlstep"><span className="ts-tlnum">3</span><b>Retirar lucro</b><small>ao fim do mês · repõe base</small></div>
       </div>
 
       <div className="ts-metgrid">
@@ -602,25 +560,11 @@ export default function TraderSite() {
   }, [tapeSyms.join(",")]);
   const led = ledger.stats || null;
   const featPick = useMemo(() => Object.values(picks || {}).find((p) => p.featured && p.show), [picks]);
-  const stats = useMemo(() => {
-    const h = hist.filter((r) => r.pct != null);
-    const n = h.length;
-    const subiu = n ? Math.round(h.filter((r) => r.pct > 0).length / n * 100) : 0; // % das ações que subiram nos resultados
-    const avgPct = n ? h.reduce((a, r) => a + r.pct, 0) / n : 0;
-    const pred = h.filter((r) => r.predicted && r.predicted !== "NEUTRO");
-    const hits = pred.filter((r) => (r.predicted === "SUBIR" && r.pct > 0) || (r.predicted === "DESCER" && r.pct < 0)).length;
-    const acerto = pred.length ? Math.round(hits / pred.length * 100) : null;
-    return { n, subiu, avgPct, acerto };
-  }, [hist]);
   const histSum = hist.reduce((a, r) => a + (Number(r.pnl) || 0), 0);
   const totalPL = settings.totalPL != null ? Number(settings.totalPL) : histSum; // Total L/P: da conta DEGIRO (upload) ou soma do histórico
   const saldo = settings.saldo != null ? Number(settings.saldo) : null; // saldo da conta (DEGIRO, via upload)
   const capitalBase = settings.capitalBase != null ? Number(settings.capitalBase) : 2500; // capital fixo do método
   const lucroMes = saldo != null ? saldo - capitalBase : null; // lucro do mês = acima do capital base (retira no início do mês)
-  // L/P por período — soma automática dos ganhos do histórico por janela de data
-  const plPer = hist.length ? [["3 dias", 3], ["7 dias", 7], ["1 mês", 30]].map(([l, d]) => ({
-    l, v: hist.reduce((a, r) => { const age = r.date ? daysBetween(r.date) : 1e9; return age >= 0 && age <= d ? a + (Number(r.pnl) || 0) : a; }, 0),
-  })) : [];
   // suspenso: há posição aberta submersa (abaixo do preço) → capital preso → previsões suspensas
   const submersas = useMemo(() => openPos.filter((p) => { const c = posPrices[p.ticker]; return c != null && c < p.buyPrice; }), [openPos, posPrices]);
   const suspenso = submersas.length > 0;
@@ -637,7 +581,6 @@ export default function TraderSite() {
         <nav>
           <a href="#site" onClick={() => window.scrollTo({ top: 0 })}>Início</a>
           <a href="#site-metodo">Método</a>
-          <a href="#site-edu">Aprende</a>
           <a href="#site-prev">Previsões</a>
           <a href="#site-pos">Posições</a>
           <a href="#site-hist">Histórico</a>
@@ -660,21 +603,37 @@ export default function TraderSite() {
       <TraderPick pick={featPick} />
 
       <section className="ts-sec ts-topstats">
-        <div className="ts-statgrid">
-          <div className="ts-stat"><b style={{ color: "#D6A445" }}>{stats.acerto != null ? stats.acerto + "%" : "—"}</b><span>acerto das previsões</span><small>previu a direção certa</small></div>
-          <div className="ts-stat"><b>{stats.n}</b><span>resultados analisados</span><small>apresentações no histórico</small></div>
-          <div className="ts-stat"><b>{stats.subiu}%</b><span>que subiram</span><small>subiram nos resultados</small></div>
-          <div className="ts-stat"><b style={{ color: totalPL >= 0 ? "#2FA37A" : "#C8553D" }}>{totalPL >= 0 ? "+" : ""}{eur(totalPL)}</b><span>resultado total (L/P)</span><small>{settings.totalPL != null ? "conta DEGIRO" : "soma dos trades"} · média {stats.avgPct >= 0 ? "+" : ""}{stats.avgPct.toFixed(1)}%/trade</small></div>
-          {saldo != null && <div className="ts-stat"><b>{eur(saldo)}</b><span>saldo da conta</span><small>capital atual (DEGIRO)</small></div>}
-          {lucroMes != null && <div className="ts-stat"><b style={{ color: lucroMes >= 0 ? "#2FA37A" : "#C8553D" }}>{lucroMes >= 0 ? "+" : ""}{eur(lucroMes)}</b><span>lucro do mês</span><small>acima de {eur(capitalBase)} · retira no início do mês</small></div>}
-          {plPer.map((p) => <div className="ts-stat" key={p.l}><b style={{ color: p.v > 0 ? "#2FA37A" : p.v < 0 ? "#C8553D" : "var(--tx)" }}>{p.v >= 0 ? "+" : ""}{eur(p.v)}</b><span>L/P {p.l}</span><small>ganho/perda no período</small></div>)}
-          {led && led.avgHold != null && <div className="ts-stat"><b>{led.avgHold}<small style={{ fontSize: "0.5em" }}> dias</small></b><span>tempo médio por posição</span><small>entrada → saída</small></div>}
-          {led && led.best && <div className="ts-stat" onClick={() => goStock(led.best.ticker)} style={{ cursor: led.best.ticker ? "pointer" : "default" }}><b style={{ color: "#2FA37A" }}>+{led.best.pct}%</b><span>melhor trade</span><small>{led.best.ticker || led.best.name}</small></div>}
-          {led && led.worst && <div className="ts-stat" onClick={() => goStock(led.worst.ticker)} style={{ cursor: led.worst.ticker ? "pointer" : "default" }}><b style={{ color: "#C8553D" }}>{led.worst.pct}%</b><span>pior trade</span><small>{led.worst.ticker || led.worst.name}</small></div>}
-          {led && led.avgFx != null && <div className="ts-stat"><b>{led.avgFx}</b><span>câmbio médio EUR/USD</span><small>nas operações</small></div>}
-          {led && led.netPL != null && <div className="ts-stat"><b style={{ color: led.netPL >= 0 ? "#2FA37A" : "#C8553D" }}>{led.netPL >= 0 ? "+" : ""}{eur(led.netPL)}</b><span>L/P líquido</span><small>após comissões e taxas</small></div>}
-          {led && led.totalCost != null && <div className="ts-stat"><b style={{ color: "#C8553D" }}>−{eur(led.totalCost)}</b><span>custos totais</span><small>{led.costPerTrade != null ? "≈ €" + led.costPerTrade + "/trade" : "comissões + conectividade"}</small></div>}
-          {led && led.pctStd != null && <div className="ts-stat"><b>±{led.pctStd}%</b><span>consistência</span><small>desvio por trade (menor = estável)</small></div>}
+        <div className="ts-statwrap">
+          {/* Conta DEGIRO (definições / documento) */}
+          {(saldo != null || settings.totalPL != null || lucroMes != null) && (
+            <div className="ts-statgroup">
+              <h3 className="ts-statlbl">Conta DEGIRO</h3>
+              <div className="ts-statgrid">
+                {saldo != null && <div className="ts-stat"><b>{eur(saldo)}</b><span>saldo da conta</span><small>capital atual</small></div>}
+                {settings.totalPL != null && <div className="ts-stat"><b style={{ color: totalPL >= 0 ? "#2FA37A" : "#C8553D" }}>{totalPL >= 0 ? "+" : ""}{eur(totalPL)}</b><span>Total L/P</span><small>desde o início da conta</small></div>}
+                {lucroMes != null && <div className="ts-stat"><b style={{ color: lucroMes >= 0 ? "#2FA37A" : "#C8553D" }}>{lucroMes >= 0 ? "+" : ""}{eur(lucroMes)}</b><span>lucro do mês</span><small>acima de {eur(capitalBase)} · retira no início do mês</small></div>}
+              </div>
+            </div>
+          )}
+
+          {/* Trades reais — do extrato DEGIRO (ledger) */}
+          {led && led.n > 0 && (
+            <div className="ts-statgroup">
+              <h3 className="ts-statlbl">Trades reais · extrato ({led.n})</h3>
+              <div className="ts-statgrid">
+                {led.netPL != null && <div className="ts-stat"><b style={{ color: led.netPL >= 0 ? "#2FA37A" : "#C8553D" }}>{led.netPL >= 0 ? "+" : ""}{eur(led.netPL)}</b><span>L/P líquido</span><small>após comissões · {led.n} trades</small></div>}
+                {led.winRate != null && <div className="ts-stat"><b style={{ color: "#2FA37A" }}>{led.winRate}%</b><span>trades com lucro</span><small>{led.wins}/{led.n} ganharam</small></div>}
+                {led.avgPct != null && <div className="ts-stat"><b style={{ color: led.avgPct >= 0 ? "#2FA37A" : "#C8553D" }}>{led.avgPct >= 0 ? "+" : ""}{led.avgPct}%</b><span>média por trade</span><small>retorno médio</small></div>}
+                {led.avgHold != null && <div className="ts-stat"><b>{led.avgHold}<small style={{ fontSize: "0.5em" }}> dias</small></b><span>tempo médio</span><small>entrada → saída</small></div>}
+                {led.best && <div className="ts-stat" onClick={() => goStock(led.best.ticker)} style={{ cursor: led.best.ticker ? "pointer" : "default" }}><b style={{ color: "#2FA37A" }}>+{led.best.pct}%</b><span>melhor trade</span><small>{led.best.ticker || led.best.name}</small></div>}
+                {led.worst && <div className="ts-stat" onClick={() => goStock(led.worst.ticker)} style={{ cursor: led.worst.ticker ? "pointer" : "default" }}><b style={{ color: "#C8553D" }}>{led.worst.pct}%</b><span>pior trade</span><small>{led.worst.ticker || led.worst.name}</small></div>}
+                {led.totalCost != null && <div className="ts-stat"><b style={{ color: "#C8553D" }}>−{eur(led.totalCost)}</b><span>custos totais</span><small>{led.costPerTrade != null ? "≈ €" + led.costPerTrade + "/trade" : "comissões + taxas"}</small></div>}
+                {led.pctStd != null && <div className="ts-stat"><b>±{led.pctStd}%</b><span>consistência</span><small>desvio por trade</small></div>}
+                {led.avgFx != null && <div className="ts-stat"><b>{led.avgFx}</b><span>câmbio EUR/USD</span><small>média nas operações</small></div>}
+                {led.stopCount != null && <div className="ts-stat"><b style={{ color: led.stopCount > 0 ? "#C8553D" : "#2FA37A" }}>{led.stopCount}</b><span>vendas no stop −10%</span><small>regra nova · 0 forçadas até agora</small></div>}
+              </div>
+            </div>
+          )}
         </div>
         {ledger.equity && ledger.equity.length > 1 && (
           <div className="ts-equitybox">
@@ -688,8 +647,6 @@ export default function TraderSite() {
       <Positions />
 
       <Metodo ledger={ledger} />
-
-      <Educacao />
 
       <section id="site-prev" className="ts-sec">
         <h2>Previsões desta semana</h2>
@@ -949,13 +906,30 @@ export const CSS = `
 .ts-exnote{font-size:11.5px;color:var(--mut);line-height:1.5;}.ts-exnote a{color:var(--gold);}
 .ts-metstats{background:rgba(214,164,69,.06);border:1px solid var(--line);border-radius:10px;padding:11px 14px;font-size:13px;color:var(--mut);margin-bottom:16px;}
 .ts-metstats b{font-family:'IBM Plex Mono',monospace;color:var(--tx);}
-.ts-metwarn{background:rgba(200,85,61,.10);border:1px solid var(--red);border-radius:12px;padding:14px 16px;font-size:13px;line-height:1.6;color:#f0d0c8;}
+.ts-metwarn{background:rgba(47,163,122,.10);border:1px solid var(--grn);border-radius:12px;padding:14px 16px;font-size:13px;line-height:1.6;color:#cdeadd;}
 .ts-metwarn b{color:#fff;}
-/* educação (acordeão) */
-.ts-edu{display:flex;flex-direction:column;gap:8px;}
-.ts-eduitem{background:var(--s1);border:1px solid var(--line);border-radius:10px;overflow:hidden;}
-.ts-eduitem.open{border-color:var(--gold);}
-.ts-eduq{width:100%;text-align:left;background:transparent;border:none;color:var(--tx);font-size:15px;font-weight:600;padding:14px 16px;cursor:pointer;display:flex;align-items:center;gap:8px;font-family:'Inter',sans-serif;}
-.ts-eduq:hover{color:var(--gold);}
-.ts-edua{padding:0 16px 15px 38px;color:var(--mut);font-size:14px;line-height:1.65;}
+/* grupos de balões */
+.ts-statwrap{display:flex;flex-direction:column;gap:18px;}
+.ts-statlbl{font-family:'Space Grotesk',sans-serif;font-size:13px;text-transform:uppercase;letter-spacing:.08em;color:var(--gold);margin:0 0 10px;padding-bottom:6px;border-bottom:1px solid var(--line);}
+.ts-feat--clk{cursor:pointer;transition:transform .12s,box-shadow .12s;}
+.ts-feat--clk:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(0,0,0,.3);}
+/* método Fast Run: fluxo + fontes */
+.ts-flow{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin:20px 0;}
+@media(max-width:820px){.ts-flow{grid-template-columns:1fr;}}
+.ts-flowstep{background:var(--s1);border:1px solid var(--line);border-left:3px solid var(--mut);border-radius:10px;padding:14px 16px;}
+.ts-flowstep[data-fase="Análise"]{border-left-color:#4F86C6;}
+.ts-flowstep[data-fase="Decisão"]{border-left-color:var(--gold);}
+.ts-flowstep[data-fase="Execução"]{border-left-color:var(--grn);}
+.ts-flowtop{display:flex;align-items:center;gap:8px;margin-bottom:8px;}
+.ts-flown{width:24px;height:24px;border-radius:50%;background:var(--s2);border:1px solid var(--line);color:var(--tx);font-weight:700;font-size:13px;display:flex;align-items:center;justify-content:center;font-family:'IBM Plex Mono',monospace;}
+.ts-flowfase{font-size:10.5px;text-transform:uppercase;letter-spacing:.08em;color:var(--mut);}
+.ts-flowstep b{font-family:'Space Grotesk',sans-serif;font-size:15px;display:block;margin-bottom:5px;}
+.ts-flowstep p{color:var(--mut);font-size:13px;line-height:1.55;margin:0;}
+.ts-fontes{margin:6px 0 18px;}
+.ts-fontes h3{font-family:'Space Grotesk',sans-serif;font-size:16px;margin:0 0 10px;}
+.ts-fontesgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;}
+@media(max-width:720px){.ts-fontesgrid{grid-template-columns:1fr 1fr;}}
+.ts-fonte{background:var(--s1);border:1px solid var(--line);border-radius:9px;padding:11px 13px;}
+.ts-fonte b{font-size:13px;display:block;margin-bottom:3px;}
+.ts-fonte span{color:var(--mut);font-size:11.5px;line-height:1.4;}
 `;

@@ -111,6 +111,8 @@ function equityCurve(trips, base) {
 function statsFrom(trips, rows) {
   const n = trips.length;
   const wins = trips.filter((t) => t.pl > 0).length;
+  const lossCount = trips.filter((t) => t.pct < 0).length;   // vendidos a perder
+  const stopCount = trips.filter((t) => t.pct <= -10).length; // atingiram o stop −10%
   const totalPL = r2(trips.reduce((s, t) => s + t.pl, 0));
   const avgPct = n ? r1(trips.reduce((s, t) => s + t.pct, 0) / n) : null;
   const avgHold = n ? r1(trips.reduce((s, t) => s + t.holdDays, 0) / n) : null;
@@ -131,7 +133,7 @@ function statsFrom(trips, rows) {
     netPL: r2(totalPL + fees + conn), avgPct, avgHold,
     best: best && { ticker: best.ticker, name: best.name, pct: best.pct },
     worst: worst && { ticker: worst.ticker, name: worst.name, pct: worst.pct },
-    fees: r2(fees), conn: r2(conn), totalCost, costPerTrade, pctStd, avgFx,
+    fees: r2(fees), conn: r2(conn), totalCost, costPerTrade, pctStd, avgFx, lossCount, stopCount,
   };
 }
 
