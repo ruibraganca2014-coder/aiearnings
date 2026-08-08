@@ -311,6 +311,10 @@ export function Featured({ picks, suspenso, onDetail }) {
           </div>
         );
       })}
+      <div className="ts-feat ts-feat--info">
+        <div className="ts-ftinfotitle">⚠ Análise por IA</div>
+        <p>Probabilidades e valor esperado por análise de IA sobre dados de mercado. <b>Não é recomendação</b> de compra/venda. A direção nos resultados é quase moeda ao ar — risco de perda. Faz a tua própria análise.</p>
+      </div>
     </div>
   );
 }
@@ -726,6 +730,8 @@ export default function TraderSite() {
                 {led.totalCost != null && <div className="ts-stat"><b style={{ color: "#C8553D" }}>−{eur(led.totalCost)}</b><span>custos totais</span><small>{led.costPerTrade != null ? "≈ €" + led.costPerTrade + "/trade" : "comissões + taxas"}</small></div>}
                 {led.pctStd != null && <div className="ts-stat"><b>±{led.pctStd}%</b><span>consistência</span><small>desvio por trade</small></div>}
                 {led.avgFx != null && <div className="ts-stat"><b>{led.avgFx}</b><span>câmbio EUR/USD</span><small>média nas operações</small></div>}
+                {led.costPerTrade != null && <div className="ts-stat"><b style={{ color: "#C8553D" }}>−€{led.costPerTrade}</b><span>custo por trade</span><small>comissões + taxas</small></div>}
+                {led.totalCost != null && <div className="ts-stat"><b style={{ color: "#C8553D" }}>{(led.totalCost / capitalBase * 100).toFixed(1)}%</b><span>custos % da conta</span><small>sobre {eur(capitalBase)}</small></div>}
               </div>
             </div>
           )}
@@ -1071,6 +1077,10 @@ export const CSS = `
 /* grupos de balões */
 .ts-statwrap{display:flex;flex-direction:column;gap:18px;}
 .ts-statlbl{font-family:'Space Grotesk',sans-serif;font-size:13px;text-transform:uppercase;letter-spacing:.08em;color:var(--gold);margin:0 0 10px;padding-bottom:6px;border-bottom:1px solid var(--line);}
+.ts-feat--info{border-top-color:var(--gold)!important;display:flex;flex-direction:column;justify-content:center;background:rgba(214,164,69,.06);}
+.ts-ftinfotitle{font-family:'Space Grotesk',sans-serif;font-weight:700;color:var(--gold);font-size:14px;margin-bottom:8px;}
+.ts-feat--info p{color:var(--mut);font-size:12.5px;line-height:1.55;margin:0;}
+.ts-feat--info b{color:var(--tx);}
 .ts-feat--clk{cursor:pointer;transition:transform .12s,box-shadow .12s;}
 .ts-feat--clk:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(0,0,0,.3);}
 /* método Fast Run: fluxo + fontes */
