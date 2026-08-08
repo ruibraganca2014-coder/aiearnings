@@ -312,10 +312,16 @@ export function Featured({ picks, suspenso, onDetail }) {
           </div>
         );
       })}
-      <div className="ts-feat ts-feat--info">
-        <div className="ts-ftinfotitle">⚠ Análise por IA</div>
-        <p>Probabilidades e valor esperado por análise de IA sobre dados de mercado. <b>Não é recomendação</b> de compra/venda. A direção nos resultados é quase moeda ao ar — risco de perda. Faz a tua própria análise.</p>
-      </div>
+    </div>
+  );
+}
+
+// Aviso "Análise por IA" — mostrado no fundo da secção de Previsões.
+function AnaliseInfo() {
+  return (
+    <div className="ts-feat ts-feat--info ts-feat--infobottom">
+      <div className="ts-ftinfotitle">⚠ Análise por IA</div>
+      <p>Probabilidades e valor esperado por análise de IA sobre dados de mercado. <b>Não é recomendação</b> de compra/venda. A direção nos resultados é quase moeda ao ar — risco de perda. Faz a tua própria análise.</p>
     </div>
   );
 }
@@ -780,6 +786,7 @@ export default function TraderSite() {
         {suspenso && <div className="ts-suspban">⏸ Previsões <b>suspensas</b> — capital em <b>{heldTickers}</b> (a recuperar). Não é possível entrar em novas até fechar a posição.</div>}
         <Featured picks={picks} suspenso={suspenso} onDetail={setModalPick} />
         <Predictions picks={picks} suspenso={suspenso} onDetail={setModalPick} />
+        <AnaliseInfo />
       </section>
 
       <HistoricoCalendario ledger={ledger} />
@@ -1114,6 +1121,7 @@ export const CSS = `
 .ts-statwrap{display:flex;flex-direction:column;gap:18px;}
 .ts-statlbl{font-family:'Space Grotesk',sans-serif;font-size:13px;text-transform:uppercase;letter-spacing:.08em;color:var(--gold);margin:0 0 10px;padding-bottom:6px;border-bottom:1px solid var(--line);}
 .ts-feat--info{grid-column:1/-1;border-top-color:#2FA37A!important;display:flex;flex-direction:column;justify-content:center;background:rgba(47,163,122,.08);}
+.ts-feat--infobottom{margin-top:18px;}
 .ts-ftinfotitle{font-family:'Space Grotesk',sans-serif;font-weight:700;color:#2FA37A;font-size:14px;margin-bottom:8px;}
 .ts-feat--info p{color:var(--mut);font-size:12.5px;line-height:1.55;margin:0;}
 .ts-feat--info b{color:var(--tx);}
