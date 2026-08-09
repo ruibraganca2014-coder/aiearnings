@@ -1074,8 +1074,9 @@ export const CSS = `
 .ts-tpsighint{font-size:12px;color:#f0d9a8;background:rgba(214,164,69,.08);border:1px solid var(--line);border-radius:8px;padding:8px 11px;margin-bottom:10px;line-height:1.5;}
 .ts-tpsiggrid{display:grid;grid-template-columns:1fr 1fr;gap:8px 22px;}
 @media(max-width:640px){.ts-tpsiggrid{grid-template-columns:1fr;}}
-.ts-tpsigrow{display:grid;grid-template-columns:1fr 70px auto;align-items:center;gap:8px;font-size:12px;}
-.ts-tpsigl{color:var(--mut);}
+.ts-tpsec--multi .ts-tpsiggrid{grid-template-columns:1fr;} /* cards estreitos: 1 sinal por linha */
+.ts-tpsigrow{display:grid;grid-template-columns:minmax(0,1fr) 60px auto;align-items:center;gap:8px;font-size:12px;}
+.ts-tpsigl{color:var(--mut);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .ts-tpsigrow em{font-style:normal;font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--tx);white-space:nowrap;}
 .ts-sigbar{position:relative;display:inline-block;width:70px;height:6px;background:var(--s2);border-radius:3px;overflow:hidden;}
 .ts-sigfill{position:absolute;top:0;height:100%;border-radius:3px;}
