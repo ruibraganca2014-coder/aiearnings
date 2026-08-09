@@ -903,7 +903,7 @@ export const CSS = `
 .ts-feathd{display:flex;justify-content:space-between;align-items:center;}
 .ts-fttic{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:18px;}
 .ts-ftbadge{color:#0E1620;font-weight:700;font-size:11px;padding:2px 8px;border-radius:6px;font-family:'IBM Plex Mono',monospace;}
-.ts-ftname{color:var(--mut);font-size:12px;margin-top:2px;}
+.ts-ftname{color:var(--mut);font-size:12px;margin-top:2px;min-height:34px;line-height:1.35;} /* reserva ~2 linhas p/ os gráficos alinharem entre cards */
 .ts-ftnote{font-size:13px;margin-top:8px;font-style:italic;color:var(--tx);}
 .ts-ftmeta{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--mut);margin-top:8px;}
 .ts-feat.clik{cursor:pointer;}
