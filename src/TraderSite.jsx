@@ -896,8 +896,9 @@ export const CSS = `
 .ts-stat span{display:block;font-size:12.5px;color:var(--tx);margin-top:4px;}
 .ts-stat small{display:block;font-size:11px;color:var(--mut);margin-top:3px;}
 .ts-suspban{background:rgba(140,163,179,.14);border:1px solid var(--mut);border-radius:10px;padding:11px 14px;font-size:13.5px;color:var(--tx);margin-bottom:18px;}
-.ts-featwrap{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px;margin-bottom:22px;align-items:start;}
-.ts-ftlimited{margin-top:10px;font-size:10.5px;color:var(--mut);border-top:1px dashed var(--line);padding-top:8px;line-height:1.45;}
+.ts-featwrap{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px;margin-bottom:22px;align-items:stretch;}
+.ts-feat{display:flex;flex-direction:column;}
+.ts-ftlimited{margin-top:auto;font-size:10.5px;color:var(--mut);border-top:1px dashed var(--line);padding-top:8px;line-height:1.45;}
 .ts-feat{background:var(--s1);border:1px solid var(--line);border-top:3px solid;border-radius:12px;padding:14px;}
 .ts-feathd{display:flex;justify-content:space-between;align-items:center;}
 .ts-fttic{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:18px;}
